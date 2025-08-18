@@ -1,58 +1,99 @@
 ---
 description: Starter App Requirements
-globs: index.ts, src/
+globs: *.py, transcription/
 alwaysApply: false
 ---
 
-# {Language / Framework} Starter App Requirements
+# Django Live Transcription Starter App Requirements
 
-> This section can be removed: 
-
-> 1. To Get started check out the Docs on Using Cursor Rules: 
-> https://learn-cursor.com/en/blog/posts/cursor-rules-guide
-> https://learn-cursor.com/en/blog/posts/cursor-rules-advanced
-> https://forum.cursor.com/t/using-the-project-rules-in-0-45-2/44447/3
-
-> 2. Set your file patterns to match the application files in this project example: globs: index.ts, src/*.ts, etc
+Build a Django version of the flask-live-transcription app for real-time speech-to-text using Deepgram API.
 
 ## Core Requirements
-- SHOULD live in a single file with minimal dependencies, i.e. `index.ts`
-- SHOULD use {specific languages or frameworks}
-- SHOULD use the latest version of the official SDK where provided
-- MUST falls back to manual integration using the API spec where there is no SDK
-- MUST run in a terminal
-- MUST be usable in command line with a single command
-- MUST be able to run it with `--serve` flag that will start it as a http server
-- MUST get API keys and other sensitive config from a `.env` file
-- MUST provide help code comments explaining the main sections of the app
+- MUST use Django Channels for WebSocket support (replaces Flask-SocketIO)
+- MUST implement ASGI application setup (not WSGI) to support WebSocket consumers
+- MUST use in-memory channel layer for simplicity (no Redis needed)
+- MUST use latest Deepgram SDK version (v4.8.1+)
+- MUST get API keys from EXPORT terminal commands. DON'T use `.`env` files.
+- MUST run with single command: `python app.py`
+- MUST provide clear code comments explaining Deepgram integration
 
-## App Requirements:
-- SHOULD be able to use the Deepgram {Product} API
-- MUST exit gracefully without any API errors
-- MUST Runs in terminal as a CLI to connect to the API, and follows a predefined script
-- MUST Runs with --serve
+Essential dependencies:
+```python
+django>=4.2
+channels>=4.0
+deepgram-sdk>=v3.10.1
+python-dotenv>=1.0.0
+django-cors-headers>=4.0
+```
 
-> Add additional App requirements here
+## App Requirements
+- MUST integrate with Deepgram Live Transcription API
+- MUST handle real-time audio streaming from browser microphone
+- MUST support start/stop/restart transcription functionality
+- MUST display live transcription results in browser interface
+- MUST use WebSocket Consumer class for handling connections
+- MUST implement proper Deepgram connection lifecycle management
+- MUST exit gracefully and cleanup connections on disconnect
+- MUST display transcribed audio in browser
+- MUST use standard UI elements from the Deepgram Starter UI project for: buttons, text, fonts, etc
 
-## CLI Requirements:
-- MUST Connect to the API
-- MUST Start to run through a set script of interactions
-- MUST Listen for the API output and prints it in the terminal
-- MUST Listen for the API response message and prints it in the terminal
-- MUST Listen for the API response binary message, saves it to and output file and displays the path in the terminal
-- MUST Gracefully closes the connection
+Core WebSocket Consumer structure:
+```python
+class TranscriptionConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        # Accept WebSocket, setup Deepgram client
+    async def receive(self, text_data):
+        # Handle toggle_transcription, audio_stream, restart_deepgram
+    async def initialize_deepgram_connection(self):
+        # Setup Deepgram with model="nova-3", language="en-US"
+```
 
-> Add additional App requirements here
+## Server Requirements
+- MUST run Django development server with ASGI support
+- MUST print connection events to terminal for debugging
+- MUST log Deepgram connection status (open, close, error)
+- MUST display transcription results in terminal console
+- MUST handle graceful shutdown on Ctrl+C
+- - MUST run with single command: `python server.py`
+- MUST provide clear error messages for missing API keys
 
-## API Requirements:
+Terminal output should match Flask version:
 
-- MUST have a WebSocket server
-- MUST set a WebSocket server on ws://localhost:3000
-- MUST set an Upstream agent connection
-- MUST Connect to the API
+```bash
+Starting ASGI/Channel Layer
+Client connected
+Starting Deepgram connection
+[Transcription results printed here]
+```
 
-> Add additional App requirements here
+## API Requirements
+- MUST serve WebSocket on same port as HTTP (single Django server)
+- MUST configure WebSocket routing at `/ws/transcription/`
+- MUST handle these WebSocket message types:
+  - `toggle_transcription` (start/stop)
+  - `audio_stream` (binary audio data)
+  - `restart_deepgram` (connection reset)
+- MUST emit `transcription_update` messages to client
+- MUST configure CORS for WebSocket connections if needed
+
+ASGI routing configuration:
+
+```python
+application = ProtocolTypeRouter({
+    'http': get_asgi_application(),
+    'websocket': URLRouter([
+        re_path(r'ws/transcription/$', TranscriptionConsumer.as_asgi()),
+    ]),
+})
+```
 
 ## Test Requirements
-- MUST have tests that validates the apps functionality is working
+- MUST use pytest
+- MUST run with `pytest -v test_app.py`
+- MUST test WebSocket connection establishment
+- MUST test audio streaming with "audio/webm" format
+- MUST test transcription start/stop toggle functionality
+- MUST test connection restart capability
+- MUST test proper cleanup on disconnect
+- MUST validate Deepgram API integration works
 
