@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Django Live Transcription</title>
+    <link rel="stylesheet" href="/static/deepgram-styles.css">
+</head>
+<body>
+    <div class="dg-card dg-constrain-width dg-spacing-mobile-compact">
+        <h1 class="dg-hero-title">Django Live Transcription</h1>
+
+        <div class="dg-action-group">
+            <button id="startBtn" class="btn btn--primary">Start Transcription</button>
+            <button id="stopBtn" class="btn btn--danger-ghost" disabled>Stop Transcription</button>
+            <button id="restartBtn" class="btn btn--secondary" disabled>Restart Connection</button>
+        </div>
+
+        <div id="status" class="dg-status dg-status--error">Disconnected</div>
+
+        <div id="transcription" class="dg-code-block">
+            <pre><code>Click "Start Transcription" and speak into your microphone to see live transcription results here.</code></pre>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isRecording = false;
+
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const status = document.getElementById('status');
+        const transcription = document.getElementById('transcription');
+
+        function updateStatus(message, isConnected = false) {
+            status.textContent = message;
+            status.className = `dg-status ${isConnected ? 'dg-status--success' : 'dg-status--error'}`;
+        }
+
+        function appendTranscription(text, isFinal = false) {
+            const codeElement = transcription.querySelector('code');
+            const span = document.createElement('span');
+            span.style.color = isFinal ? 'var(--dg-text-primary)' : 'var(--dg-text-muted)';
+            span.style.fontStyle = isFinal ? 'normal' : 'italic';
+            span.textContent = text + ' ';
+            codeElement.appendChild(span);
+            transcription.scrollTop = transcription.scrollHeight;
+        }
+
+        function clearTranscription() {
+            const codeElement = transcription.querySelector('code');
+            codeElement.innerHTML = 'Ready to transcribe. Speak into your microphone...';
+        }
+
+        function showError(message) {
+            const codeElement = transcription.querySelector('code');
+            const errorSpan = document.createElement('span');
+            errorSpan.style.color = 'var(--dg-danger)';
+            errorSpan.textContent = '❌ ' + message + '\n';
+            codeElement.appendChild(errorSpan);
+        }
+
+        async function startTranscription() {
+            try {
+                // Request microphone access
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        sampleRate: 16000,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    }
+                });
+
+                // Setup WebSocket
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                ws = new WebSocket(`${protocol}//${window.location.host}/ws/transcription/`);
+
+                ws.onopen = () => {
+                    updateStatus('Connected - Starting transcription...', true);
+                    clearTranscription();
+
+                    // Send toggle transcription message
+                    ws.send(JSON.stringify({type: 'toggle_transcription'}));
+
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    restartBtn.disabled = false;
+                };
+
+                                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    console.log('Received WebSocket message:', data);
+
+                    if (data.type === 'transcription_update') {
+                        console.log('Transcription received:', data.transcript, 'Final:', data.is_final);
+                        appendTranscription(data.transcript, data.is_final);
+                    } else if (data.type === 'transcription_status') {
+                        updateStatus(`Connected - ${data.status}`, true);
+                    } else if (data.type === 'error') {
+                        showError(data.message);
+                    }
+                };
+
+                ws.onclose = () => {
+                    updateStatus('Disconnected');
+                    stopRecording();
+                };
+
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    updateStatus('Connection error');
+                    showError('WebSocket connection failed');
+                };
+
+                // Setup Web Audio API for raw PCM audio
+                console.log('Setting up Web Audio API...');
+                window.audioContext = new AudioContext({sampleRate: 16000});
+                window.audioStream = stream;
+                console.log('AudioContext created. Sample rate:', window.audioContext.sampleRate);
+                console.log('Audio tracks:', stream.getAudioTracks().map(t => ({
+                    label: t.label,
+                    enabled: t.enabled,
+                    readyState: t.readyState
+                })));
+
+                const source = window.audioContext.createMediaStreamSource(stream);
+                const processor = window.audioContext.createScriptProcessor(4096, 1, 1);
+
+                let chunkCount = 0;
+                let audioDetected = false;
+
+                processor.onaudioprocess = (event) => {
+                    chunkCount++;
+
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        const inputBuffer = event.inputBuffer;
+                        const inputData = inputBuffer.getChannelData(0);
+
+                        // Check for actual audio content
+                        let maxLevel = 0;
+                        let hasSignal = false;
+                        for (let i = 0; i < inputData.length; i++) {
+                            const level = Math.abs(inputData[i]);
+                            if (level > maxLevel) maxLevel = level;
+                            if (level > 0.01) hasSignal = true; // Threshold for detecting audio
+                        }
+
+                        if (hasSignal && !audioDetected) {
+                            console.log('🎤 Audio signal detected! Max level:', maxLevel);
+                            audioDetected = true;
+                        }
+
+                        // Convert float32 to int16 (linear16)
+                        const int16Array = new Int16Array(inputData.length);
+                        for (let i = 0; i < inputData.length; i++) {
+                            int16Array[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
+                        }
+
+                        if (chunkCount % 50 === 0 || hasSignal) { // Log every 50th chunk or when audio detected
+                            console.log(`Chunk ${chunkCount}: ${int16Array.length * 2} bytes, maxLevel: ${maxLevel.toFixed(4)}, hasSignal: ${hasSignal}, WS state: ${ws.readyState}`);
+                        }
+
+                        ws.send(int16Array.buffer);
+                    } else {
+                        if (chunkCount % 50 === 0) {
+                            console.log(`Chunk ${chunkCount}: WebSocket not ready, state: ${ws ? ws.readyState : 'null'}`);
+                        }
+                    }
+                };
+
+                source.connect(processor);
+                processor.connect(window.audioContext.destination);
+                console.log('Audio processing pipeline connected');
+                isRecording = true;
+
+            } catch (error) {
+                console.error('Error starting transcription:', error);
+                showError('Failed to access microphone: ' + error.message);
+                updateStatus('Microphone access denied');
+            }
+        }
+
+                function stopRecording() {
+            if (isRecording) {
+                // Stop audio context and stream
+                if (window.audioContext) {
+                    window.audioContext.close();
+                }
+                if (window.audioStream) {
+                    window.audioStream.getTracks().forEach(track => track.stop());
+                }
+                isRecording = false;
+            }
+
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            restartBtn.disabled = true;
+        }
+
+        function stopTranscription() {
+            if (ws) {
+                ws.send(JSON.stringify({type: 'toggle_transcription'}));
+                ws.close();
+                ws = null;
+            }
+            stopRecording();
+            updateStatus('Stopped');
+        }
+
+        function restartTranscription() {
+            if (ws) {
+                ws.send(JSON.stringify({type: 'restart_deepgram'}));
+            }
+        }
+
+        startBtn.addEventListener('click', startTranscription);
+        stopBtn.addEventListener('click', stopTranscription);
+        restartBtn.addEventListener('click', restartTranscription);
+
+        // Initialize
+        updateStatus('Ready to start');
+    </script>
+</body>
+</html>

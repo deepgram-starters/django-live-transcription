@@ -54,7 +54,6 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
 - MUST log Deepgram connection status (open, close, error)
 - MUST display transcription results in terminal console
 - MUST handle graceful shutdown on Ctrl+C
-- - MUST run with single command: `python server.py`
 - MUST provide clear error messages for missing API keys
 
 Terminal output should match Flask version:
