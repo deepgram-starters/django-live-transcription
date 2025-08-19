@@ -3,7 +3,7 @@ import sys
 import json
 import asyncio
 import logging
-import struct
+
 from pathlib import Path
 
 def check_api_key():
@@ -171,27 +171,17 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
                 logger.error("Invalid JSON received")
 
         elif bytes_data:
-            # Comprehensive debugging to compare with Flask behavior
-            print(f"🔍 DJANGO RECEIVED DATA ANALYSIS:")
-            print(f"   Type: {type(bytes_data)}")
-            print(f"   Length: {len(bytes_data)} bytes")
-            print(f"   First 20 bytes: {list(bytes_data[:20])}")
+            print(f"📡 Received {len(bytes_data)} bytes")
 
             if self.is_transcribing and self.deepgram_connection:
                 try:
-                    print(f"📤 SENDING TO DEEPGRAM:")
-                    print(f"   Connection type: {type(self.deepgram_connection)}")
-                    print(f"   Data type: {type(bytes_data)}")
-                    print(f"   Data length: {len(bytes_data)}")
-
                     self.deepgram_connection.send(bytes_data)
-                    print(f"✅ Send successful")
+                    print(f"📤 Sent to Deepgram")
                 except Exception as e:
                     print(f"❌ Error sending to Deepgram: {e}")
-                    print(f"   Exception type: {type(e)}")
                     logger.error(f"Error sending audio data to Deepgram: {e}")
             else:
-                print(f"⚠️ Not ready - transcribing: {self.is_transcribing}, connection: {self.deepgram_connection is not None}")
+                print(f"⚠️ Not ready - transcribing: {self.is_transcribing}")
 
     async def handle_toggle_transcription(self):
         """Toggle transcription on/off."""
@@ -287,30 +277,7 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
                         })))
 
             async def on_metadata(self, metadata, **kwargs):
-                print("🆔 DEEPGRAM METADATA RECEIVED:")
-                print(f"   Raw metadata: {metadata}")
-
-                # Extract request ID and other useful info based on Deepgram response structure
-                if isinstance(metadata, dict):
-                    # Direct access to request_id
-                    if 'request_id' in metadata:
-                        print(f"   🎯 Request ID: {metadata['request_id']}")
-
-                    # Check for nested metadata structure
-                    if 'metadata' in metadata:
-                        meta = metadata['metadata']
-                        print(f"   🎯 Request ID: {meta.get('request_id', 'N/A')}")
-                        print(f"   ⏱️  Duration: {meta.get('duration', 'N/A')} seconds")
-                        print(f"   📊 Channels: {meta.get('channels', 'N/A')}")
-                        print(f"   🗓️  Created: {meta.get('created', 'N/A')}")
-                        if 'models' in meta:
-                            print(f"   🤖 Model IDs: {meta['models']}")
-
-                # Also check if it has attributes (object style)
-                if hasattr(metadata, 'request_id'):
-                    print(f"   🎯 Request ID (attr): {metadata.request_id}")
-                if hasattr(metadata, 'metadata') and hasattr(metadata.metadata, 'request_id'):
-                    print(f"   🎯 Request ID (nested): {metadata.metadata.request_id}")
+                print(f"🆔 Metadata received")
 
             async def on_close(self, close, **kwargs):
                 print(f"🔴 DEEPGRAM CONNECTION CLOSED: {close}")
@@ -351,57 +318,7 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
             logger.error(f"Failed to initialize Deepgram connection: {e}")
             raise
 
-    async def on_deepgram_open(self, *args, **kwargs):
-        """Handle Deepgram connection open event."""
-        print("🟢 DEEPGRAM CONNECTION OPENED - Ready for audio!")
-        logger.info("Deepgram connection opened")
 
-    async def on_deepgram_transcript(self, result, **kwargs):
-        """Handle incoming transcription results from Deepgram."""
-        try:
-            if result:
-                transcript = result.channel.alternatives[0].transcript
-                if transcript.strip():
-                    # ✅ PROMINENT TERMINAL OUTPUT FOR DEBUGGING
-                    print("=" * 50)
-                    print("🎤 LIVE TRANSCRIPTION RESULT:")
-                    print(f"📝 Text: '{transcript}'")
-                    print(f"🔄 Final: {result.is_final}")
-                    print(f"📊 Confidence: {result.channel.alternatives[0].confidence if hasattr(result.channel.alternatives[0], 'confidence') else 'N/A'}")
-                    print("=" * 50)
-
-                    # Also log normally
-                    logger.info(f"Transcription received: {transcript}")
-
-                    # Match Flask version exactly - just send transcription text
-                    await self.send(text_data=json.dumps({
-                        'type': 'transcription_update',
-                        'transcription': transcript
-                    }))
-                else:
-                    print("🔇 Empty transcript received")
-
-        except Exception as e:
-            print(f"❌ ERROR processing transcript: {e}")
-            logger.error(f"Error processing transcript: {e}")
-
-    async def on_deepgram_error(self, *args, **kwargs):
-        """Handle Deepgram connection errors."""
-        error = kwargs.get('error')
-        print("🔴 DEEPGRAM ERROR:")
-        print(f"❌ Error: {error}")
-        print(f"🔍 Error type: {type(error)}")
-        logger.error(f"Deepgram error: {error}")
-
-        await self.send(text_data=json.dumps({
-            'type': 'error',
-            'message': f"Deepgram error: {str(error)}"
-        }))
-
-    async def on_deepgram_close(self, *args, **kwargs):
-        """Handle Deepgram connection close event."""
-        logger.info("Deepgram connection closed")
-        self.is_transcribing = False
 
 # =============================================================================
 # DJANGO VIEWS & URL ROUTING

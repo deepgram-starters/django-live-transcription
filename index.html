@@ -38,15 +38,7 @@
             status.className = `dg-status ${isConnected ? 'dg-status--success' : 'dg-status--error'}`;
         }
 
-        function appendTranscription(text, isFinal = false) {
-            const codeElement = transcription.querySelector('code');
-            const span = document.createElement('span');
-            span.style.color = isFinal ? 'var(--dg-text-primary)' : 'var(--dg-text-muted)';
-            span.style.fontStyle = isFinal ? 'normal' : 'italic';
-            span.textContent = text + ' ';
-            codeElement.appendChild(span);
-            transcription.scrollTop = transcription.scrollHeight;
-        }
+
 
         function clearTranscription() {
             const codeElement = transcription.querySelector('code');
@@ -93,7 +85,7 @@
 
                 async function startTranscription() {
                                     try {
-                console.log('🎤 Starting transcription with linear16 PCM (supported format)...');
+                console.log('🎤 Starting transcription with MediaRecorder (WebM)...');
 
                 microphone = await getMicrophone();
                 console.log("✅ Microphone access granted");
@@ -116,11 +108,9 @@
 
                                 ws.onmessage = (event) => {
                     const data = JSON.parse(event.data);
-                    console.log('Received WebSocket message:', data);
+                    console.log('Received:', data.type);
 
                     if (data.type === 'transcription_update') {
-                        console.log('Transcription received:', data.transcription);
-                        // Simple replacement like Flask version
                         const codeElement = transcription.querySelector('code');
                         codeElement.textContent = data.transcription;
                         transcription.scrollTop = transcription.scrollHeight;
