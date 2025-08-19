@@ -3,6 +3,7 @@ import sys
 import json
 import asyncio
 import logging
+import struct
 from pathlib import Path
 
 def check_api_key():
@@ -96,7 +97,7 @@ from django.http import HttpResponse
 from django.urls import path, re_path
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.generic.websocket import AsyncWebsocketConsumer
-from deepgram import DeepgramClient, LiveTranscriptionEvents, LiveOptions
+from deepgram import DeepgramClient, LiveTranscriptionEvents, LiveOptions, DeepgramClientOptions
 
 logger = logging.getLogger('transcription')
 
@@ -125,8 +126,19 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
             await self.close(code=4000, reason="Missing API key")
             return
 
-        self.deepgram_client = DeepgramClient(api_key)
-        logger.info("Deepgram client initialized")
+        # Validate API key format
+        if not api_key.startswith('sha256'):
+            logger.warning(f"API key format check: {api_key[:8]}... (expected format: sha256...)")
+        else:
+            logger.info(f"API key validated: {api_key[:8]}...")
+
+        # Set up client configuration like the working Flask version
+        config = DeepgramClientOptions(
+            verbose=logging.WARN,
+            options={"keepalive": "true"}
+        )
+        self.deepgram_client = DeepgramClient(api_key, config)
+        logger.info("Deepgram client initialized with keepalive")
 
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection and cleanup Deepgram connections."""
@@ -159,16 +171,27 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
                 logger.error("Invalid JSON received")
 
         elif bytes_data:
-            # Handle binary audio data
-            logger.debug(f"Received audio data: {len(bytes_data)} bytes")
+            # Comprehensive debugging to compare with Flask behavior
+            print(f"🔍 DJANGO RECEIVED DATA ANALYSIS:")
+            print(f"   Type: {type(bytes_data)}")
+            print(f"   Length: {len(bytes_data)} bytes")
+            print(f"   First 20 bytes: {list(bytes_data[:20])}")
+
             if self.is_transcribing and self.deepgram_connection:
                 try:
+                    print(f"📤 SENDING TO DEEPGRAM:")
+                    print(f"   Connection type: {type(self.deepgram_connection)}")
+                    print(f"   Data type: {type(bytes_data)}")
+                    print(f"   Data length: {len(bytes_data)}")
+
                     self.deepgram_connection.send(bytes_data)
-                    logger.debug(f"Sent {len(bytes_data)} bytes to Deepgram")
+                    print(f"✅ Send successful")
                 except Exception as e:
+                    print(f"❌ Error sending to Deepgram: {e}")
+                    print(f"   Exception type: {type(e)}")
                     logger.error(f"Error sending audio data to Deepgram: {e}")
             else:
-                logger.warning(f"Received {len(bytes_data)} bytes but not transcribing or no connection. is_transcribing: {self.is_transcribing}, connection: {self.deepgram_connection is not None}")
+                print(f"⚠️ Not ready - transcribing: {self.is_transcribing}, connection: {self.deepgram_connection is not None}")
 
     async def handle_toggle_transcription(self):
         """Toggle transcription on/off."""
@@ -228,32 +251,101 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
     async def initialize_deepgram_connection(self):
         """Initialize Deepgram live transcription connection."""
         try:
+            # Simple config like Flask - let Deepgram auto-detect WebM
             options = LiveOptions(
                 model="nova-3",
                 language="en-US",
-                encoding="linear16",
-                channels=1,
-                sample_rate=16000,
-                interim_results=True,
-                utterance_end_ms="1000",
-                vad_events=True,
-                endpointing=300,
+                interim_results=True
             )
 
             # Create live transcription connection
-            self.deepgram_connection = self.deepgram_client.listen.asynclive.v("1")
+            self.deepgram_connection = self.deepgram_client.listen.asyncwebsocket.v("1")
 
-            # Set up event handlers
-            self.deepgram_connection.on(LiveTranscriptionEvents.Open, self.on_deepgram_open)
-            self.deepgram_connection.on(LiveTranscriptionEvents.Transcript, self.on_deepgram_transcript)
-            self.deepgram_connection.on(LiveTranscriptionEvents.Error, self.on_deepgram_error)
-            self.deepgram_connection.on(LiveTranscriptionEvents.Close, self.on_deepgram_close)
+            # Capture Django consumer reference for callbacks
+            consumer = self
 
-            # Start the connection
-            if not await self.deepgram_connection.start(options):
-                raise Exception("Failed to start Deepgram connection")
+                        # Define standalone callback functions (like working examples)
+            async def on_open(self, open, **kwargs):
+                print("🟢 DEEPGRAM CONNECTION OPENED - Ready for audio!")
+                print(f"🔍 Open event data: {open}")
 
-            logger.info("Deepgram connection initialized successfully")
+            async def on_message(self, result, **kwargs):
+                if result:
+                    transcript = result.channel.alternatives[0].transcript
+                    if transcript.strip():
+                        print("=" * 50)
+                        print("🎤 LIVE TRANSCRIPTION RESULT:")
+                        print(f"📝 Text: '{transcript}'")
+                        print(f"🔄 Final: {result.is_final}")
+                        print("=" * 50)
+
+                        # Send to Django WebSocket using captured consumer reference
+                        import asyncio
+                        asyncio.create_task(consumer.send(text_data=json.dumps({
+                            'type': 'transcription_update',
+                            'transcription': transcript
+                        })))
+
+            async def on_metadata(self, metadata, **kwargs):
+                print("🆔 DEEPGRAM METADATA RECEIVED:")
+                print(f"   Raw metadata: {metadata}")
+
+                # Extract request ID and other useful info based on Deepgram response structure
+                if isinstance(metadata, dict):
+                    # Direct access to request_id
+                    if 'request_id' in metadata:
+                        print(f"   🎯 Request ID: {metadata['request_id']}")
+
+                    # Check for nested metadata structure
+                    if 'metadata' in metadata:
+                        meta = metadata['metadata']
+                        print(f"   🎯 Request ID: {meta.get('request_id', 'N/A')}")
+                        print(f"   ⏱️  Duration: {meta.get('duration', 'N/A')} seconds")
+                        print(f"   📊 Channels: {meta.get('channels', 'N/A')}")
+                        print(f"   🗓️  Created: {meta.get('created', 'N/A')}")
+                        if 'models' in meta:
+                            print(f"   🤖 Model IDs: {meta['models']}")
+
+                # Also check if it has attributes (object style)
+                if hasattr(metadata, 'request_id'):
+                    print(f"   🎯 Request ID (attr): {metadata.request_id}")
+                if hasattr(metadata, 'metadata') and hasattr(metadata.metadata, 'request_id'):
+                    print(f"   🎯 Request ID (nested): {metadata.metadata.request_id}")
+
+            async def on_close(self, close, **kwargs):
+                print(f"🔴 DEEPGRAM CONNECTION CLOSED: {close}")
+
+            async def on_error(self, error, **kwargs):
+                print(f"🔴 DEEPGRAM ERROR: {error}")
+
+            async def on_unhandled(self, unhandled, **kwargs):
+                print(f"🤷 UNHANDLED DEEPGRAM MESSAGE: {unhandled}")
+
+            # Set up event handlers (exact same pattern as working examples)
+            self.deepgram_connection.on(LiveTranscriptionEvents.Open, on_open)
+            self.deepgram_connection.on(LiveTranscriptionEvents.Transcript, on_message)
+            self.deepgram_connection.on(LiveTranscriptionEvents.Metadata, on_metadata)
+            self.deepgram_connection.on(LiveTranscriptionEvents.Close, on_close)
+            self.deepgram_connection.on(LiveTranscriptionEvents.Error, on_error)
+            self.deepgram_connection.on(LiveTranscriptionEvents.Unhandled, on_unhandled)
+
+            # Start the connection with detailed logging
+            logger.info(f"Attempting to start Deepgram connection with options: {options}")
+            try:
+                addons = {"no_delay": "true"}
+                connection_result = await self.deepgram_connection.start(options, addons=addons)
+                logger.info(f"Deepgram start() returned: {connection_result}")
+
+                if not connection_result:
+                    logger.error("Deepgram connection start returned False")
+                    raise Exception("Failed to start Deepgram connection - start() returned False")
+
+                logger.info("Deepgram connection initialized successfully")
+
+            except Exception as start_error:
+                logger.error(f"Exception during Deepgram start(): {start_error}")
+                logger.error(f"Exception type: {type(start_error)}")
+                raise Exception(f"Failed to start Deepgram connection: {start_error}")
 
         except Exception as e:
             logger.error(f"Failed to initialize Deepgram connection: {e}")
@@ -261,30 +353,44 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
 
     async def on_deepgram_open(self, *args, **kwargs):
         """Handle Deepgram connection open event."""
+        print("🟢 DEEPGRAM CONNECTION OPENED - Ready for audio!")
         logger.info("Deepgram connection opened")
 
-    async def on_deepgram_transcript(self, *args, **kwargs):
+    async def on_deepgram_transcript(self, result, **kwargs):
         """Handle incoming transcription results from Deepgram."""
         try:
-            result = kwargs.get('result')
             if result:
                 transcript = result.channel.alternatives[0].transcript
                 if transcript.strip():
-                    logger.info(f"Transcription: {transcript}")
+                    # ✅ PROMINENT TERMINAL OUTPUT FOR DEBUGGING
+                    print("=" * 50)
+                    print("🎤 LIVE TRANSCRIPTION RESULT:")
+                    print(f"📝 Text: '{transcript}'")
+                    print(f"🔄 Final: {result.is_final}")
+                    print(f"📊 Confidence: {result.channel.alternatives[0].confidence if hasattr(result.channel.alternatives[0], 'confidence') else 'N/A'}")
+                    print("=" * 50)
 
+                    # Also log normally
+                    logger.info(f"Transcription received: {transcript}")
+
+                    # Match Flask version exactly - just send transcription text
                     await self.send(text_data=json.dumps({
                         'type': 'transcription_update',
-                        'transcript': transcript,
-                        'is_final': result.is_final,
-                        'confidence': result.channel.alternatives[0].confidence
+                        'transcription': transcript
                     }))
+                else:
+                    print("🔇 Empty transcript received")
 
         except Exception as e:
+            print(f"❌ ERROR processing transcript: {e}")
             logger.error(f"Error processing transcript: {e}")
 
     async def on_deepgram_error(self, *args, **kwargs):
         """Handle Deepgram connection errors."""
         error = kwargs.get('error')
+        print("🔴 DEEPGRAM ERROR:")
+        print(f"❌ Error: {error}")
+        print(f"🔍 Error type: {type(error)}")
         logger.error(f"Deepgram error: {error}")
 
         await self.send(text_data=json.dumps({

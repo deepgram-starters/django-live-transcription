@@ -61,17 +61,42 @@
             codeElement.appendChild(errorSpan);
         }
 
-        async function startTranscription() {
+          let microphone = null;
+
+        async function getMicrophone() {
             try {
-                // Request microphone access
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        sampleRate: 16000,
-                        channelCount: 1,
-                        echoCancellation: true,
-                        noiseSuppression: true
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                return new MediaRecorder(stream, { mimeType: "audio/webm" });
+            } catch (error) {
+                console.error("Error accessing microphone:", error);
+                throw error;
+            }
+        }
+
+        async function openMicrophone(microphone, ws) {
+            return new Promise((resolve) => {
+                microphone.onstart = () => {
+                    console.log("🎤 Microphone opened");
+                    resolve();
+                };
+
+                microphone.ondataavailable = async (event) => {
+                    console.log("📡 Audio data:", event.data.size, "bytes");
+                    if (event.data.size > 0 && ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(event.data);
                     }
-                });
+                };
+
+                microphone.start(1000); // Send chunks every 1000ms (like Flask)
+            });
+        }
+
+                async function startTranscription() {
+                                    try {
+                console.log('🎤 Starting transcription with linear16 PCM (supported format)...');
+
+                microphone = await getMicrophone();
+                console.log("✅ Microphone access granted");
 
                 // Setup WebSocket
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -94,8 +119,11 @@
                     console.log('Received WebSocket message:', data);
 
                     if (data.type === 'transcription_update') {
-                        console.log('Transcription received:', data.transcript, 'Final:', data.is_final);
-                        appendTranscription(data.transcript, data.is_final);
+                        console.log('Transcription received:', data.transcription);
+                        // Simple replacement like Flask version
+                        const codeElement = transcription.querySelector('code');
+                        codeElement.textContent = data.transcription;
+                        transcription.scrollTop = transcription.scrollHeight;
                     } else if (data.type === 'transcription_status') {
                         updateStatus(`Connected - ${data.status}`, true);
                     } else if (data.type === 'error') {
@@ -114,65 +142,9 @@
                     showError('WebSocket connection failed');
                 };
 
-                // Setup Web Audio API for raw PCM audio
-                console.log('Setting up Web Audio API...');
-                window.audioContext = new AudioContext({sampleRate: 16000});
-                window.audioStream = stream;
-                console.log('AudioContext created. Sample rate:', window.audioContext.sampleRate);
-                console.log('Audio tracks:', stream.getAudioTracks().map(t => ({
-                    label: t.label,
-                    enabled: t.enabled,
-                    readyState: t.readyState
-                })));
-
-                const source = window.audioContext.createMediaStreamSource(stream);
-                const processor = window.audioContext.createScriptProcessor(4096, 1, 1);
-
-                let chunkCount = 0;
-                let audioDetected = false;
-
-                processor.onaudioprocess = (event) => {
-                    chunkCount++;
-
-                    if (ws && ws.readyState === WebSocket.OPEN) {
-                        const inputBuffer = event.inputBuffer;
-                        const inputData = inputBuffer.getChannelData(0);
-
-                        // Check for actual audio content
-                        let maxLevel = 0;
-                        let hasSignal = false;
-                        for (let i = 0; i < inputData.length; i++) {
-                            const level = Math.abs(inputData[i]);
-                            if (level > maxLevel) maxLevel = level;
-                            if (level > 0.01) hasSignal = true; // Threshold for detecting audio
-                        }
-
-                        if (hasSignal && !audioDetected) {
-                            console.log('🎤 Audio signal detected! Max level:', maxLevel);
-                            audioDetected = true;
-                        }
-
-                        // Convert float32 to int16 (linear16)
-                        const int16Array = new Int16Array(inputData.length);
-                        for (let i = 0; i < inputData.length; i++) {
-                            int16Array[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
-                        }
-
-                        if (chunkCount % 50 === 0 || hasSignal) { // Log every 50th chunk or when audio detected
-                            console.log(`Chunk ${chunkCount}: ${int16Array.length * 2} bytes, maxLevel: ${maxLevel.toFixed(4)}, hasSignal: ${hasSignal}, WS state: ${ws.readyState}`);
-                        }
-
-                        ws.send(int16Array.buffer);
-                    } else {
-                        if (chunkCount % 50 === 0) {
-                            console.log(`Chunk ${chunkCount}: WebSocket not ready, state: ${ws ? ws.readyState : 'null'}`);
-                        }
-                    }
-                };
-
-                source.connect(processor);
-                processor.connect(window.audioContext.destination);
-                console.log('Audio processing pipeline connected');
+                                // Start microphone recording
+                console.log("🎙️ Waiting to open microphone");
+                await openMicrophone(microphone, ws);
                 isRecording = true;
 
             } catch (error) {
@@ -182,15 +154,12 @@
             }
         }
 
-                function stopRecording() {
-            if (isRecording) {
-                // Stop audio context and stream
-                if (window.audioContext) {
-                    window.audioContext.close();
-                }
-                if (window.audioStream) {
-                    window.audioStream.getTracks().forEach(track => track.stop());
-                }
+                                        function stopRecording() {
+            if (isRecording && microphone) {
+                console.log("🔇 Stopping microphone...");
+                microphone.stop();
+                microphone.stream.getTracks().forEach(track => track.stop());
+                microphone = null;
                 isRecording = false;
             }
 
