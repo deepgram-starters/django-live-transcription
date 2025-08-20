@@ -75,11 +75,12 @@
                 microphone.ondataavailable = async (event) => {
                     console.log("📡 Audio data:", event.data.size, "bytes");
                     if (event.data.size > 0 && ws && ws.readyState === WebSocket.OPEN) {
+                        console.log("📤 Sending audio chunk to backend");
                         ws.send(event.data);
                     }
                 };
 
-                microphone.start(1000); // Send chunks every 1000ms (like Flask)
+                microphone.start(250); // Send chunks every 250ms for better real-time performance
             });
         }
 
@@ -98,12 +99,14 @@
                     updateStatus('Connected - Starting transcription...', true);
                     clearTranscription();
 
-                    // Send toggle transcription message
+                    // Send toggle transcription message immediately to avoid timeout
                     ws.send(JSON.stringify({type: 'toggle_transcription'}));
 
                     startBtn.disabled = true;
                     stopBtn.disabled = false;
                     restartBtn.disabled = false;
+
+                    console.log("🟢 WebSocket connected, starting microphone...");
                 };
 
                                 ws.onmessage = (event) => {

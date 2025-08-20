@@ -53,7 +53,6 @@ DATABASES = {
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'styles'),
     os.path.join(BASE_DIR, 'static'),
 ]
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -114,6 +113,9 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
         self.deepgram_client = None
         self.deepgram_connection = None
         self.is_transcribing = False
+        self.audio_buffer = bytearray()
+        self.buffer_lock = asyncio.Lock()
+        self.buffer_task = None
 
     async def connect(self):
         """Accept WebSocket connection and setup Deepgram client."""
@@ -151,6 +153,11 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
             except Exception as e:
                 logger.error(f"Error closing Deepgram connection: {e}")
 
+        # Clear audio buffer on disconnect
+        async with self.buffer_lock:
+            self.audio_buffer.clear()
+            logger.info("Audio buffer cleared")
+
         self.is_transcribing = False
 
     async def receive(self, text_data=None, bytes_data=None):
@@ -173,15 +180,14 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
         elif bytes_data:
             print(f"📡 Received {len(bytes_data)} bytes")
 
+            # Add audio data to buffer for decoupling
+            async with self.buffer_lock:
+                self.audio_buffer.extend(bytes_data)
+                print(f"🧠 Buffer size: {len(self.audio_buffer)} bytes")
+
+            # Send buffered audio if transcribing
             if self.is_transcribing and self.deepgram_connection:
-                try:
-                    self.deepgram_connection.send(bytes_data)
-                    print(f"📤 Sent to Deepgram")
-                except Exception as e:
-                    print(f"❌ Error sending to Deepgram: {e}")
-                    logger.error(f"Error sending audio data to Deepgram: {e}")
-            else:
-                print(f"⚠️ Not ready - transcribing: {self.is_transcribing}")
+                await self.process_audio_buffer()
 
     async def handle_toggle_transcription(self):
         """Toggle transcription on/off."""
@@ -218,6 +224,11 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
                 await self.deepgram_connection.finish()
                 self.deepgram_connection = None
 
+            # Clear audio buffer when stopping
+            async with self.buffer_lock:
+                self.audio_buffer.clear()
+                logger.info("Audio buffer cleared on stop")
+
             self.is_transcribing = False
 
             await self.send(text_data=json.dumps({
@@ -238,10 +249,28 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
         await asyncio.sleep(0.5)
         await self.start_transcription()
 
+    async def process_audio_buffer(self):
+        """Process buffered audio data and send to Deepgram."""
+        try:
+            buffer_data = None
+            async with self.buffer_lock:
+                if len(self.audio_buffer) > 0:
+                    # Send buffer contents
+                    buffer_data = bytes(self.audio_buffer)
+                    self.audio_buffer.clear()  # Clear buffer after copying
+
+            if buffer_data:
+                await self.deepgram_connection.send(buffer_data)
+                print(f"📤 Sent {len(buffer_data)} bytes to Deepgram")
+
+        except Exception as e:
+            print(f"❌ Error processing audio buffer: {e}")
+            logger.error(f"Error processing audio buffer: {e}")
+
     async def initialize_deepgram_connection(self):
         """Initialize Deepgram live transcription connection."""
         try:
-            # Simple config like Flask - let Deepgram auto-detect WebM
+                        # Configure for audio from frontend MediaRecorder - let Deepgram auto-detect format
             options = LiveOptions(
                 model="nova-3",
                 language="en-US",
@@ -345,8 +374,8 @@ urlpatterns = [
 from django.conf.urls.static import static
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
-# Add static files handling for development
-urlpatterns += staticfiles_urlpatterns()
+# Add static files handling for development (disabled for testing)
+# urlpatterns += staticfiles_urlpatterns()
 
 # =============================================================================
 # ASGI APPLICATION SETUP (WEBSOCKET ROUTING)
