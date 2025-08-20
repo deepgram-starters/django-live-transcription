@@ -21,9 +21,13 @@ Essential dependencies:
 ```python
 django>=4.2
 channels>=4.0
-deepgram-sdk>=v3.10.1
+deepgram-sdk>=4.8.1
 python-dotenv>=1.0.0
 django-cors-headers>=4.0
+daphne>=4.0.0
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-django>=4.5.0
 ```
 
 ## App Requirements
@@ -37,17 +41,6 @@ django-cors-headers>=4.0
 - MUST display transcribed audio in browser
 - MUST use standard UI elements from the Deepgram Starter UI project for: buttons, text, fonts, etc
 
-Core WebSocket Consumer structure:
-```python
-class TranscriptionConsumer(AsyncWebsocketConsumer):
-    async def connect(self):
-        # Accept WebSocket, setup Deepgram client
-    async def receive(self, text_data):
-        # Handle toggle_transcription, audio_stream, restart_deepgram
-    async def initialize_deepgram_connection(self):
-        # Setup Deepgram with model="nova-3", language="en-US"
-```
-
 ## Server Requirements
 - MUST run Django development server with ASGI support
 - MUST print connection events to terminal for debugging
@@ -55,15 +48,15 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
 - MUST display transcription results in terminal console
 - MUST handle graceful shutdown on Ctrl+C
 - MUST provide clear error messages for missing API keys
+- MUST Open the websocket connection with the SDK, then you take the audio event (with no audio config) from the open microphone and send it to the websocket connection (with no audio config).
 
-Terminal output should match Flask version:
+## Audio Considerations
 
-```bash
-Starting ASGI/Channel Layer
-Client connected
-Starting Deepgram connection
-[Transcription results printed here]
-```
+- The first audio packet has audio headers that Deepgram needs
+- MUST connect to Deepgram and send the audio before the connection times out (~10s)
+- DON'T do any byte conversion on the data
+- MUST Build an audio buffer on the backend to decouple of received data events from the state of the WebSocket connection
+
 
 ## API Requirements
 - MUST serve WebSocket on same port as HTTP (single Django server)
@@ -75,16 +68,6 @@ Starting Deepgram connection
 - MUST emit `transcription_update` messages to client
 - MUST configure CORS for WebSocket connections if needed
 
-ASGI routing configuration:
-
-```python
-application = ProtocolTypeRouter({
-    'http': get_asgi_application(),
-    'websocket': URLRouter([
-        re_path(r'ws/transcription/$', TranscriptionConsumer.as_asgi()),
-    ]),
-})
-```
 
 ## Test Requirements
 - MUST use pytest

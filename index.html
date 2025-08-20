@@ -13,7 +13,6 @@
         <div class="dg-action-group">
             <button id="startBtn" class="btn btn--primary">Start Transcription</button>
             <button id="stopBtn" class="btn btn--danger-ghost" disabled>Stop Transcription</button>
-            <button id="restartBtn" class="btn btn--secondary" disabled>Restart Connection</button>
         </div>
 
         <div id="status" class="dg-status dg-status--error">Disconnected</div>
@@ -29,7 +28,6 @@
 
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
-        const restartBtn = document.getElementById('restartBtn');
         const status = document.getElementById('status');
         const transcription = document.getElementById('transcription');
 
@@ -104,7 +102,6 @@
 
                     startBtn.disabled = true;
                     stopBtn.disabled = false;
-                    restartBtn.disabled = false;
 
                     console.log("🟢 WebSocket connected, starting microphone...");
                 };
@@ -158,7 +155,6 @@
 
             startBtn.disabled = false;
             stopBtn.disabled = true;
-            restartBtn.disabled = true;
         }
 
         function stopTranscription() {
@@ -171,15 +167,8 @@
             updateStatus('Stopped');
         }
 
-        function restartTranscription() {
-            if (ws) {
-                ws.send(JSON.stringify({type: 'restart_deepgram'}));
-            }
-        }
-
         startBtn.addEventListener('click', startTranscription);
         stopBtn.addEventListener('click', stopTranscription);
-        restartBtn.addEventListener('click', restartTranscription);
 
         // Initialize
         updateStatus('Ready to start');

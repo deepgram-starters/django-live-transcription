@@ -96,38 +96,7 @@ class TestTranscriptionConsumer:
 
         await consumer_communicator.disconnect()
 
-    @pytest.mark.asyncio
-    async def test_restart_deepgram_functionality(self, consumer_communicator):
-        """Test Deepgram connection restart capability."""
-        connected, _ = await consumer_communicator.connect()
-        assert connected
 
-        with patch('app.DeepgramClient') as mock_deepgram:
-            mock_connection = AsyncMock()
-            mock_deepgram.return_value.listen.asynclive.v.return_value = mock_connection
-            mock_connection.start.return_value = True
-
-            # Start transcription first
-            await consumer_communicator.send_json_to({
-                'type': 'toggle_transcription'
-            })
-            await consumer_communicator.receive_json_from()  # Consume start response
-
-            # Restart connection
-            await consumer_communicator.send_json_to({
-                'type': 'restart_deepgram'
-            })
-
-            # Should receive stopped and then started status
-            response1 = await consumer_communicator.receive_json_from()
-            assert response1['type'] == 'transcription_status'
-            assert response1['status'] == 'stopped'
-
-            response2 = await consumer_communicator.receive_json_from()
-            assert response2['type'] == 'transcription_status'
-            assert response2['status'] == 'started'
-
-        await consumer_communicator.disconnect()
 
     @pytest.mark.asyncio
     async def test_transcription_result_handling(self, consumer_communicator):

@@ -169,8 +169,6 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
 
                 if message_type == 'toggle_transcription':
                     await self.handle_toggle_transcription()
-                elif message_type == 'restart_deepgram':
-                    await self.handle_restart_deepgram()
                 else:
                     logger.warning(f"Unknown message type: {message_type}")
 
@@ -239,15 +237,7 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logger.error(f"Error stopping transcription: {e}")
 
-    async def handle_restart_deepgram(self):
-        """Restart Deepgram connection."""
-        logger.info("Restarting Deepgram connection")
 
-        if self.is_transcribing:
-            await self.stop_transcription()
-
-        await asyncio.sleep(0.5)
-        await self.start_transcription()
 
     async def process_audio_buffer(self):
         """Process buffered audio data and send to Deepgram."""
