@@ -361,6 +361,11 @@ urlpatterns = [
 from django.conf.urls.static import static
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
+# Add static file URL patterns to serve CSS and other static files
+urlpatterns += staticfiles_urlpatterns()
+if DEBUG:
+    urlpatterns += static(STATIC_URL, document_root=STATICFILES_DIRS[0])
+
 # =============================================================================
 # ASGI APPLICATION SETUP (WEBSOCKET ROUTING)
 # =============================================================================
