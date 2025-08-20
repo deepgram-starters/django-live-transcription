@@ -55,7 +55,7 @@ pytest-django>=4.5.0
 - The first audio packet has audio headers that Deepgram needs to work
 - MUST connect to Deepgram and send the audio before the connection times out of (~10s)
 - DON'T do any byte conversion on the audio data
-- MUST Build an audio buffer on the backend to decouple of received data events from the state of the WebSocket connection
+- MUST Build an audio buffer on the backend to decouple received data events from the state of the WebSocket connection
 
 
 ## API Requirements
