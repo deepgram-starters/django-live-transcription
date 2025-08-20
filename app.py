@@ -260,7 +260,6 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
     async def initialize_deepgram_connection(self):
         """Initialize Deepgram live transcription connection."""
         try:
-                        # Configure for audio from frontend MediaRecorder - let Deepgram auto-detect format
             options = LiveOptions(
                 model="nova-3",
                 language="en-US",
@@ -273,7 +272,6 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
             # Capture Django consumer reference for callbacks
             consumer = self
 
-                        # Define standalone callback functions (like working examples)
             async def on_open(self, open, **kwargs):
                 print("🟢 DEEPGRAM CONNECTION OPENED - Ready for audio!")
                 print(f"🔍 Open event data: {open}")
@@ -307,7 +305,7 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
             async def on_unhandled(self, unhandled, **kwargs):
                 print(f"🤷 UNHANDLED DEEPGRAM MESSAGE: {unhandled}")
 
-            # Set up event handlers (exact same pattern as working examples)
+            # Set up event handlers
             self.deepgram_connection.on(LiveTranscriptionEvents.Open, on_open)
             self.deepgram_connection.on(LiveTranscriptionEvents.Transcript, on_message)
             self.deepgram_connection.on(LiveTranscriptionEvents.Metadata, on_metadata)
@@ -338,7 +336,6 @@ class TranscriptionConsumer(AsyncWebsocketConsumer):
             raise
 
 
-
 # =============================================================================
 # DJANGO VIEWS & URL ROUTING
 # =============================================================================
@@ -363,9 +360,6 @@ urlpatterns = [
 # Add static file serving for development
 from django.conf.urls.static import static
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
-
-# Add static files handling for development (disabled for testing)
-# urlpatterns += staticfiles_urlpatterns()
 
 # =============================================================================
 # ASGI APPLICATION SETUP (WEBSOCKET ROUTING)
@@ -410,7 +404,6 @@ def main():
         from daphne.server import Server
         from daphne.endpoints import build_endpoint_description_strings
 
-        # Start daphne server directly
         server = Server(
             application=application,
             endpoints=build_endpoint_description_strings(host='0.0.0.0', port=8080),

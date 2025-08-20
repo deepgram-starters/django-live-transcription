@@ -48,13 +48,13 @@ pytest-django>=4.5.0
 - MUST display transcription results in terminal console
 - MUST handle graceful shutdown on Ctrl+C
 - MUST provide clear error messages for missing API keys
-- MUST Open the websocket connection with the SDK, then you take the audio event (with no audio config) from the open microphone and send it to the websocket connection (with no audio config).
+- MUST Open the websocket connection with the SDK, then take the audio event (with no audio config) from the open microphone and send it to the websocket connection (with no audio config).
 
 ## Audio Considerations
 
-- The first audio packet has audio headers that Deepgram needs
-- MUST connect to Deepgram and send the audio before the connection times out (~10s)
-- DON'T do any byte conversion on the data
+- The first audio packet has audio headers that Deepgram needs to work
+- MUST connect to Deepgram and send the audio before the connection times out of (~10s)
+- DON'T do any byte conversion on the audio data
 - MUST Build an audio buffer on the backend to decouple of received data events from the state of the WebSocket connection
 
 
