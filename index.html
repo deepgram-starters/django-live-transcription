@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Django Live Transcription</title>
+    <link rel="stylesheet" href="/static/deepgram-styles.css">
+</head>
+<body>
+    <div class="dg-card dg-constrain-width dg-spacing-mobile-compact" style="max-height: 50vh; overflow-y: auto;">
+        <h1 class="dg-hero-title">Django Live Transcription</h1>
+
+        <div class="dg-action-group">
+            <button id="startBtn" class="btn btn--primary">Start Transcription</button>
+            <button id="stopBtn" class="btn btn--danger-ghost" disabled>Stop Transcription</button>
+        </div>
+
+        <div id="status" class="dg-status dg-status--error">Disconnected</div>
+
+        <div id="transcription" class="dg-code-block">
+            <pre><code>Click "Start Transcription" and speak into your microphone to see live transcription results here.</code></pre>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isRecording = false;
+
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const status = document.getElementById('status');
+        const transcription = document.getElementById('transcription');
+
+        function updateStatus(message, isConnected = false) {
+            status.textContent = message;
+            status.className = `dg-status ${isConnected ? 'dg-status--success' : 'dg-status--error'}`;
+        }
+
+
+
+        function clearTranscription() {
+            const codeElement = transcription.querySelector('code');
+            codeElement.innerHTML = 'Ready to transcribe. Speak into your microphone...';
+        }
+
+        function showError(message) {
+            const codeElement = transcription.querySelector('code');
+            const errorSpan = document.createElement('span');
+            errorSpan.style.color = 'var(--dg-danger)';
+            errorSpan.textContent = '❌ ' + message + '\n';
+            codeElement.appendChild(errorSpan);
+        }
+
+          let microphone = null;
+
+        async function getMicrophone() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                return new MediaRecorder(stream, { mimeType: "audio/webm" });
+            } catch (error) {
+                console.error("Error accessing microphone:", error);
+                throw error;
+            }
+        }
+
+        async function openMicrophone(microphone, ws) {
+            return new Promise((resolve) => {
+                microphone.onstart = () => {
+                    console.log("🎤 Microphone opened");
+                    resolve();
+                };
+
+                microphone.ondataavailable = async (event) => {
+                    console.log("📡 Audio data:", event.data.size, "bytes");
+                    if (event.data.size > 0 && ws && ws.readyState === WebSocket.OPEN) {
+                        console.log("📤 Sending audio chunk to backend");
+                        ws.send(event.data);
+                    }
+                };
+
+                microphone.start(250); // Send chunks every 250ms for better real-time performance
+            });
+        }
+
+                async function startTranscription() {
+                                    try {
+                console.log('🎤 Starting transcription with MediaRecorder (WebM)...');
+
+                microphone = await getMicrophone();
+                console.log("✅ Microphone access granted");
+
+                // Setup WebSocket
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                ws = new WebSocket(`${protocol}//${window.location.host}/ws/transcription/`);
+
+                ws.onopen = () => {
+                    updateStatus('Connected - Starting transcription...', true);
+                    clearTranscription();
+
+                    // Send toggle transcription message immediately to avoid timeout
+                    ws.send(JSON.stringify({type: 'toggle_transcription'}));
+
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+
+                    console.log("🟢 WebSocket connected, starting microphone...");
+                };
+
+                                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    console.log('Received:', data.type);
+
+                    if (data.type === 'transcription_update') {
+                        const codeElement = transcription.querySelector('code');
+                        codeElement.textContent = data.transcription;
+                        transcription.scrollTop = transcription.scrollHeight;
+                    } else if (data.type === 'transcription_status') {
+                        updateStatus(`Connected - ${data.status}`, true);
+                    } else if (data.type === 'error') {
+                        showError(data.message);
+                    }
+                };
+
+                ws.onclose = () => {
+                    updateStatus('Disconnected');
+                    stopRecording();
+                };
+
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    updateStatus('Connection error');
+                    showError('WebSocket connection failed');
+                };
+
+                                // Start microphone recording
+                console.log("🎙️ Waiting to open microphone");
+                await openMicrophone(microphone, ws);
+                isRecording = true;
+
+            } catch (error) {
+                console.error('Error starting transcription:', error);
+                showError('Failed to access microphone: ' + error.message);
+                updateStatus('Microphone access denied');
+            }
+        }
+
+                                        function stopRecording() {
+            if (isRecording && microphone) {
+                console.log("🔇 Stopping microphone...");
+                microphone.stop();
+                microphone.stream.getTracks().forEach(track => track.stop());
+                microphone = null;
+                isRecording = false;
+            }
+
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+        }
+
+        function stopTranscription() {
+            if (ws) {
+                ws.send(JSON.stringify({type: 'toggle_transcription'}));
+                ws.close();
+                ws = null;
+            }
+            stopRecording();
+            updateStatus('Stopped');
+        }
+
+        startBtn.addEventListener('click', startTranscription);
+        stopBtn.addEventListener('click', stopTranscription);
+
+        // Initialize
+        updateStatus('Ready to start');
+    </script>
+</body>
+</html>
