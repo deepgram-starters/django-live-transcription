@@ -2,7 +2,7 @@
 title = "Django Live Transcription Starter"
 description = "Get started using Deepgram's Live Transcription with this Django demo app"
 author = "Deepgram DX Team <devrel@deepgram.com> (https://developers.deepgram.com)"
-useCase = "STT"
+useCase = "Live STT"
 language = "Python"
 framework = "Django"
 sdk = "4.8.1"
