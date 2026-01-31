@@ -1,105 +1,102 @@
 # Django Live Transcription Starter
 
-Get started using Deepgram's Live Transcription with this Django demo app. This application demonstrates real-time speech-to-text transcription using Deepgram's Speech to Text API.
+Real-time speech-to-text transcription powered by Deepgram with Django Channels.
 
-## What is Deepgram?
+## Features
 
-[Deepgram’s](https://deepgram.com/) voice AI platform provides APIs for speech-to-text, text-to-speech, and full speech-to-speech voice agents. Over 200,000+ developers use Deepgram to build voice AI products and features.
-
-## Sign-up to Deepgram
-
-Before you start, it's essential to generate a Deepgram API key to use in this project. [Sign-up now for Deepgram and create an API key](https://console.deepgram.com/signup?jump=keys).
+- Real-time streaming transcription via WebSocket
+- Minimal Django setup with no database
+- Django Channels for WebSocket support
+- Simple metadata API endpoint
 
 ## Prerequisites
 
-Before you start, ensure you have:
 - Python 3.8+
-- pip for package installation
-- A [Deepgram API Key](https://console.deepgram.com/signup?jump=keys)
+- Deepgram API key ([get one here](https://console.deepgram.com/signup))
 
-## Quickstart
+## Setup
 
-Follow these steps to get started with this starter application.
-
-### Clone the repository
-
-1. Go to Github and [clone](https://github.com/deepgram-starters/flask-live-transcription.git)
-
-2. Install dependencies
-
-Install the project dependencies.
-
+1. Clone the repository:
 ```bash
+git clone https://github.com/deepgram-starters/django-live-transcription.git
+cd django-live-transcription
+```
+
+2. Initialize and update the frontend submodule:
+```bash
+git submodule init
+git submodule update
+```
+
+3. Create a virtual environment and install dependencies:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
-3. Set your Deepgram API key:
+
+4. Create a `.env` file with your Deepgram API key:
+```bash
+cp .env.example .env
+# Edit .env and add your DEEPGRAM_API_KEY
+```
+
+## Running the Application
+
+Start the Django development server with Daphne (ASGI server):
 
 ```bash
-export DEEPGRAM_API_KEY=your_api_key_here
+daphne -b 0.0.0.0 -p 8000 config.asgi:application
 ```
 
-## Running the application
-
-Start the application server:
+Or use the Django development server:
 
 ```bash
-python app.py
+python manage.py runserver
 ```
 
-Then open your browser and go to:
+The application will be available at `http://localhost:8000`
+
+## API Endpoints
+
+### HTTP Endpoints
+
+- `GET /api/metadata` - Get application metadata
+
+### WebSocket Endpoints
+
+- `ws://localhost:8000/stt/stream` - Live transcription stream
+  1. Connect to WebSocket
+  2. Send configuration as JSON: `{"model": "nova-2", "language": "en"}`
+  3. Send audio data as binary frames
+  4. Receive transcription results as JSON
+
+## Project Structure
 
 ```
-http://localhost:8080
-
-```
-- Allow microphone access when prompted.
-- Speak into your microphone to interact with the Deepgram Speech to Text API.
-- You should see your audio transcription in your browser.
-
-## Using Cursor & MDC Rules
-
-This application can be modify as needed by using the [app-requirements.mdc](.cursor/rules/app-requirements.mdc) file. This file allows you to specify various settings and parameters for the application in a structured format that can be use along with [Cursor's](https://www.cursor.com/) AI Powered Code Editor.
-
-### Using the `app-requirements.mdc` File
-
-1. Clone or Fork this repo.
-2. Modify the `app-requirements.mdc`
-3. Add the necessary configuration settings in the file.
-4. You can refer to the MDC file used to help build this starter application by reviewing  [app-requirements.mdc](.cursor/rules/app-requirements.mdc)
-
-## Testing
-
-Test the application with:
-
-```bash
-pytest -v test_app.py
+django-live-transcription/
+├── config/              # Django configuration
+│   ├── settings.py      # Minimal settings (no database)
+│   ├── urls.py          # HTTP URL routing
+│   ├── asgi.py          # ASGI config with Channels
+│   └── wsgi.py          # WSGI config
+├── starter/             # Main application
+│   ├── views.py         # HTTP views
+│   ├── urls.py          # HTTP URL patterns
+│   ├── consumers.py     # WebSocket consumers
+│   └── routing.py       # WebSocket URL patterns
+├── frontend/            # Frontend (git submodule)
+├── manage.py            # Django management script
+├── requirements.txt     # Python dependencies
+└── deepgram.toml        # Application metadata
 ```
 
-## Getting Help
+## Learn More
 
-We love to hear from you so if you have questions, comments or find a bug in the project, let us know! You can either:
-
-- [Open an issue in this repository](https://github.com/deepgram-starters/django-live-transcription/issues/new)
-- [Join the Deepgram Github Discussions Community](https://github.com/orgs/deepgram/discussions)
-- [Join the Deepgram Discord Community](https://discord.gg/deepgram)
-
-## Contributing
-
-See our [Contributing Guidelines](./CONTRIBUTING.md) to learn about contributing to this project.
-
-## Code of Conduct
-
-This project follows the [Deepgram Code of Conduct](./CODE_OF_CONDUCT.md).
-
-## Security
-
-For security policy and procedures, see our [Security Policy](./SECURITY.md).
+- [Deepgram API Documentation](https://developers.deepgram.com/)
+- [Django Channels Documentation](https://channels.readthedocs.io/)
+- [Django Documentation](https://docs.djangoproject.com/)
 
 ## License
 
-This project is licensed under the MIT license. See the [LICENSE](./LICENSE) file for more info.
-
-## Author
-
-[Deepgram](https://deepgram.com)
-
+MIT License - see LICENSE file for details
