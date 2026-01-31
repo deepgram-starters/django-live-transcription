@@ -44,6 +44,3 @@ staticfiles/
 # OS
 .DS_Store
 Thumbs.db
-
-# Frontend (managed as submodule)
-frontend/
