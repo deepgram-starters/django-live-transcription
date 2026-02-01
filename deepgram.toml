@@ -1,11 +1,11 @@
 [meta]
-title = "Django Live Transcription Starter"
+title = "Django Live Transcription"
 description = "Get started using Deepgram's Live Transcription with this Django demo app"
 author = "Deepgram DX Team <devrel@deepgram.com> (https://developers.deepgram.com)"
 useCase = "Live STT"
 language = "Python"
 framework = "Django"
-sdk = "4.8.1"
+sdk = "N/A"
 repository = "https://github.com/deepgram-starters/django-live-transcription"
 
 [build]
