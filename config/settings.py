@@ -7,41 +7,31 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Server configuration
+PORT = int(os.environ.get('PORT', 8081))
+HOST = os.environ.get('HOST', '0.0.0.0')
+FRONTEND_PORT = int(os.environ.get('FRONTEND_PORT', 8080))
+
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-dev-key-change-in-production')
 DEBUG = True
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
     'daphne',  # Must be first for Channels
-    'django.contrib.staticfiles',
-    'channels',
     'corsheaders',
+    'channels',
     'starter',
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.security.SecurityMiddleware',
     'django.middleware.common.CommonMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
 WSGI_APPLICATION = 'config.wsgi.application'
 ASGI_APPLICATION = 'config.asgi.application'
-
-TEMPLATES = [
-    {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-            ],
-        },
-    },
-]
 
 # No database needed
 DATABASES = {}
@@ -51,14 +41,13 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = '/assets/'
-STATIC_ROOT = BASE_DIR / 'frontend' / 'dist' / 'assets'
-STATICFILES_DIRS = [BASE_DIR / 'frontend' / 'dist']
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS settings
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS configuration
+CORS_ALLOWED_ORIGINS = [
+    f"http://localhost:{FRONTEND_PORT}",
+    f"http://127.0.0.1:{FRONTEND_PORT}",
+]
 CORS_ALLOW_CREDENTIALS = True
 
 # Channels settings
