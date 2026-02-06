@@ -1,102 +1,60 @@
-# Django Live Transcription Starter
+# Django Live Transcription
 
-Real-time speech-to-text transcription powered by Deepgram with Django Channels.
+Get started using Deepgram's Live Transcription with this Django demo app
 
-## Features
+<!-- [**Live Demo \u2192**](#) -->
 
-- Real-time streaming transcription via WebSocket
-- Minimal Django setup with no database
-- Django Channels for WebSocket support
-- Simple metadata API endpoint
+## Quick Start
 
-## Prerequisites
+Click the button below to fork the repo:
 
-- Python 3.8+
-- Deepgram API key ([get one here](https://console.deepgram.com/signup))
+[![Fork on GitHub](https://img.shields.io/badge/Fork_on_GitHub-blue?logo=github)](https://github.com/deepgram-starters/django-live-transcription/fork)
 
-## Setup
+## Local Development
 
-1. Clone the repository:
+<!--
+### CLI
+
 ```bash
-git clone https://github.com/deepgram-starters/django-live-transcription.git
+dg check
+dg install
+dg start
+```
+-->
+
+### Makefile (Recommended)
+
+```bash
+make init
+cp sample.env .env  # Add your DEEPGRAM_API_KEY
+make start
+```
+
+Open [http://localhost:8080](http://localhost:8080) in your browser.
+
+### Python & pnpm
+
+```bash
+git clone --recurse-submodules https://github.com/deepgram-starters/django-live-transcription.git
 cd django-live-transcription
+python3 -m venv venv
+./venv/bin/pip install -r requirements.txt
+cd frontend && corepack pnpm install && cd ..
+cp sample.env .env  # Add your DEEPGRAM_API_KEY
 ```
 
-2. Initialize and update the frontend submodule:
-```bash
-git submodule init
-git submodule update
-```
-
-3. Create a virtual environment and install dependencies:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-4. Create a `.env` file with your Deepgram API key:
-```bash
-cp .env.example .env
-# Edit .env and add your DEEPGRAM_API_KEY
-```
-
-## Running the Application
-
-Start the Django development server with Daphne (ASGI server):
+Start both servers in separate terminals:
 
 ```bash
-daphne -b 0.0.0.0 -p 8000 config.asgi:application
+# Terminal 1 - Backend (port 8081)
+./venv/bin/daphne -b 0.0.0.0 -p 8081 config.asgi:application
+
+# Terminal 2 - Frontend (port 8080)
+cd frontend && corepack pnpm run dev -- --port 8080 --no-open
 ```
 
-Or use the Django development server:
-
-```bash
-python manage.py runserver
-```
-
-The application will be available at `http://localhost:8000`
-
-## API Endpoints
-
-### HTTP Endpoints
-
-- `GET /api/metadata` - Get application metadata
-
-### WebSocket Endpoints
-
-- `ws://localhost:8000/stt/stream` - Live transcription stream
-  1. Connect to WebSocket
-  2. Send configuration as JSON: `{"model": "nova-2", "language": "en"}`
-  3. Send audio data as binary frames
-  4. Receive transcription results as JSON
-
-## Project Structure
-
-```
-django-live-transcription/
-├── config/              # Django configuration
-│   ├── settings.py      # Minimal settings (no database)
-│   ├── urls.py          # HTTP URL routing
-│   ├── asgi.py          # ASGI config with Channels
-│   └── wsgi.py          # WSGI config
-├── starter/             # Main application
-│   ├── views.py         # HTTP views
-│   ├── urls.py          # HTTP URL patterns
-│   ├── consumers.py     # WebSocket consumers
-│   └── routing.py       # WebSocket URL patterns
-├── frontend/            # Frontend (git submodule)
-├── manage.py            # Django management script
-├── requirements.txt     # Python dependencies
-└── deepgram.toml        # Application metadata
-```
-
-## Learn More
-
-- [Deepgram API Documentation](https://developers.deepgram.com/)
-- [Django Channels Documentation](https://channels.readthedocs.io/)
-- [Django Documentation](https://docs.djangoproject.com/)
+Open [http://localhost:8080](http://localhost:8080) in your browser.
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT - See [LICENSE](./LICENSE)
