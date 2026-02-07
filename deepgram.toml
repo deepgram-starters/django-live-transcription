@@ -4,9 +4,10 @@ description = "Get started using Deepgram's Live Transcription with this Django 
 author = "Deepgram DX Team <devrel@deepgram.com> (https://developers.deepgram.com)"
 repository = "https://github.com/deepgram-starters/django-live-transcription"
 useCase = "live-transcription"
-language = "Python"
-framework = "Django"
+language = "python"
+framework = "django"
 sdk = "N/A"
+tags = ["live-transcription", "live-stt", "real-time-transcription", "real-time-asr", "streaming-transcription", "live-speech-to-text", "python", "django"]
 
 # Check prerequisites
 [check]
