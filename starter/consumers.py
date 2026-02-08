@@ -24,7 +24,7 @@ class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         """Accept WebSocket connection from client"""
         await self.accept()
-        print("Client connected to /stt/stream")
+        print("Client connected to /api/live-transcription")
 
         # Parse query parameters from scope
         query_string = self.scope.get('query_string', b'').decode('utf-8')

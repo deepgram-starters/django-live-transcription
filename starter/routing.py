@@ -3,5 +3,5 @@ from django.urls import path
 from . import consumers
 
 websocket_urlpatterns = [
-    path('stt/stream', consumers.LiveTranscriptionConsumer.as_asgi()),
+    path('api/live-transcription', consumers.LiveTranscriptionConsumer.as_asgi()),
 ]
