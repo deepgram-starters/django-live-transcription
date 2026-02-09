@@ -5,7 +5,9 @@ import asyncio
 from urllib.parse import parse_qs
 from channels.generic.websocket import AsyncWebsocketConsumer
 import websockets
+import jwt
 from dotenv import load_dotenv
+from starter.views import SESSION_SECRET
 
 load_dotenv()
 API_KEY = os.environ.get("DEEPGRAM_API_KEY")
@@ -13,6 +15,7 @@ if not API_KEY:
     raise ValueError("DEEPGRAM_API_KEY required")
 
 DEEPGRAM_STT_URL = "wss://api.deepgram.com/v1/listen"
+
 
 class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
@@ -23,7 +26,24 @@ class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
         """Accept WebSocket connection from client"""
-        await self.accept()
+        # Validate JWT from subprotocol
+        protocols = self.scope.get("subprotocols", [])
+        valid_proto = None
+        for proto in protocols:
+            if proto.startswith("access_token."):
+                token = proto[len("access_token."):]
+                try:
+                    jwt.decode(token, SESSION_SECRET, algorithms=["HS256"])
+                    valid_proto = proto
+                except Exception:
+                    pass
+                break
+
+        if not valid_proto:
+            await self.close(code=4401)
+            return
+
+        await self.accept(subprotocol=valid_proto)
         print("Client connected to /api/live-transcription")
 
         # Parse query parameters from scope
