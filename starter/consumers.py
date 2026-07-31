@@ -143,6 +143,12 @@ class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
             async for message in self.connection:
                 if isinstance(message, (bytes, bytearray)):
                     await self.send(bytes_data=bytes(message))
+                elif isinstance(message, dict):
+                    # listen.v2's socket iterator yields raw bytes OR
+                    # construct_type(...) over a union that includes typing.Any,
+                    # so plain dicts legitimately arrive and must be forwarded
+                    # intact (a dict has no model_dump_json / .type).
+                    await self.send(text_data=json.dumps(message))
                 elif hasattr(message, "model_dump_json"):
                     await self.send(text_data=message.model_dump_json())
                 else:
