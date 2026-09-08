@@ -85,7 +85,7 @@ Frontend: `cd frontend && corepack pnpm install`
 ## Customization Guide
 
 ### Changing Default Parameters
-The WebSocket connection URL passes parameters to Deepgram. Find where the Deepgram WebSocket URL is constructed in the backend and modify defaults:
+The backend passes WebSocket parameters to `deepgram.listen.v1.connect(...)` in `starter/consumers.py`. Modify those keyword arguments to change defaults:
 
 | Parameter | Default | Options | Effect |
 |-----------|---------|---------|--------|
@@ -163,6 +163,9 @@ chore(deps): update frontend submodule
 ```bash
 # Run conformance tests (requires app to be running)
 make test
+
+# Run browser-safe error-detail regression tests
+python -m unittest discover -s tests
 
 # Manual endpoint check
 curl -sf http://localhost:8081/api/metadata | python3 -m json.tool
