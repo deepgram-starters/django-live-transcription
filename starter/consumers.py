@@ -172,7 +172,16 @@ class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
                 else:
                     print("Ignoring unexpected text message from client")
         except Exception as e:
-            print(f"Error forwarding to Deepgram: {_safe_error_detail(e)}")
+            detail = _safe_error_detail(e)
+            print(f"Error forwarding to Deepgram: {detail}")
+            try:
+                await self.send(text_data=json.dumps({
+                    "type": "Error",
+                    "description": detail,
+                    "code": "PROVIDER_ERROR"
+                }))
+            except Exception:
+                pass
             await self.close(code=3000)
 
     async def forward_from_deepgram(self):

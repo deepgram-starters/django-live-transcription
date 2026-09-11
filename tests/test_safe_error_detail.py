@@ -1,6 +1,7 @@
 import os
 import unittest
 import asyncio
+import json
 
 os.environ.setdefault("DEEPGRAM_API_KEY", "test-api-key")
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
@@ -64,6 +65,39 @@ class SafeErrorDetailTests(unittest.TestCase):
             asyncio.run(exercise()),
             ["KeepAlive", "Finalize", "CloseStream"],
         )
+
+    def test_media_send_failure_reports_a_safe_provider_error(self):
+        class Connection:
+            async def send_media(self, _data):
+                raise ConnectionClosed(Close(1011, "audio timeout"), None)
+
+        async def exercise():
+            consumer = object.__new__(LiveTranscriptionConsumer)
+            consumer.connection = Connection()
+            sent = []
+            closed = []
+
+            async def send(**kwargs):
+                sent.append(kwargs)
+
+            async def close(**kwargs):
+                closed.append(kwargs)
+
+            consumer.send = send
+            consumer.close = close
+            await consumer.receive(bytes_data=b"audio")
+            return sent, closed
+
+        sent, closed = asyncio.run(exercise())
+        self.assertEqual(
+            json.loads(sent[0]["text_data"]),
+            {
+                "type": "Error",
+                "description": "Deepgram closed the connection (code 1011: audio timeout)",
+                "code": "PROVIDER_ERROR",
+            },
+        )
+        self.assertEqual(closed, [{"code": 3000}])
 
     def test_unmodeled_sdk_frames_are_ignored(self):
         class Connection:
