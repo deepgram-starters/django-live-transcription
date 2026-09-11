@@ -97,7 +97,7 @@ The frontend defaults to `nova-3`; the backend falls back to `nova-2` if the bro
 | `channels` | `1` | `1`, `2` | Mono or stereo |
 
 ### Adding More Deepgram Features via Query Params
-To add one of these features, include its browser WebSocket query parameter in `frontend/main.js`, then read it in the backend and pass it as a keyword argument to `deepgram.listen.v1.connect(...)`:
+The frontend currently sends only `model`, `language`, `encoding`, `sample_rate`, and `channels`. To add a feature below that is supported by a typed `connect()` argument, include its browser WebSocket query parameter in `frontend/main.js`, then read it in the backend and pass it as a keyword argument to `deepgram.listen.v1.connect(...)`:
 
 | Feature | Parameter | Example | Effect |
 |---------|-----------|---------|--------|
@@ -110,9 +110,9 @@ To add one of these features, include its browser WebSocket query parameter in `
 | Keywords | `keywords` | `deepgram:2` | Boost keyword with weight |
 | No delay | `no_delay` | `true` | Minimize latency (may reduce accuracy) |
 
-**Backend:** Pass supported params as keyword arguments to `deepgram.listen.v1.connect(...)` in the WebSocket proxy handler.
+**Backend:** Pass typed params as keyword arguments to `deepgram.listen.v1.connect(...)` in the WebSocket proxy handler. For unmodeled options such as `no_delay`, use `request_options={"additional_query_parameters": {"no_delay": value}}`.
 
-**Frontend:** The frontend sends these as query params when opening the WebSocket. To add a UI control for a new param, edit `frontend/main.js` — add an input/checkbox and include it in the `URLSearchParams` when connecting.
+**Frontend:** To add a UI control for a new param, edit `frontend/main.js` — add an input/checkbox and include it in the `URLSearchParams` when connecting.
 
 ### Changing Audio Format
 If changing from browser microphone (Linear16) to another source:
@@ -143,7 +143,7 @@ The frontend is a git submodule from `deepgram-starters/live-transcription-html`
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
 | `DEEPGRAM_API_KEY` | Yes | — | Deepgram API key |
-| `DEEPGRAM_BASE_URL` | No | Production endpoint | Override the Deepgram WebSocket endpoint for testing or staging |
+| `DEEPGRAM_BASE_URL` | No | `wss://api.deepgram.com` | Override the WebSocket origin for testing or staging, e.g. `wss://api.staging.deepgram.com` (without `/v1/listen`) |
 | `PORT` | No | `8081` | Backend server port |
 | `HOST` | No | `0.0.0.0` | Backend bind address |
 | `SESSION_SECRET` | No | — | JWT signing secret (production) |
