@@ -12,6 +12,8 @@ django.setup()
 from deepgram.core.api_error import ApiError
 from starter.consumers import _safe_error_detail
 from starter.consumers import LiveTranscriptionConsumer
+from websockets.exceptions import ConnectionClosed
+from websockets.frames import Close
 
 
 class SafeErrorDetailTests(unittest.TestCase):
@@ -24,8 +26,44 @@ class SafeErrorDetailTests(unittest.TestCase):
             )
         )
 
-        self.assertIn("HTTP 401", detail)
-        self.assertNotIn("FAKE", detail)
+        self.assertEqual(detail, "Deepgram rejected the connection (HTTP 401)")
+
+    def test_connection_closed_preserves_safe_close_details(self):
+        detail = _safe_error_detail(
+            ConnectionClosed(Close(1011, "audio timeout"), None)
+        )
+
+        self.assertEqual(
+            detail,
+            "Deepgram closed the connection (code 1011: audio timeout)",
+        )
+
+    def test_control_frames_are_forwarded_to_deepgram(self):
+        class Connection:
+            def __init__(self):
+                self.calls = []
+
+            async def send_keep_alive(self):
+                self.calls.append("KeepAlive")
+
+            async def send_finalize(self):
+                self.calls.append("Finalize")
+
+            async def send_close_stream(self):
+                self.calls.append("CloseStream")
+
+        async def exercise():
+            consumer = object.__new__(LiveTranscriptionConsumer)
+            consumer.connection = Connection()
+            consumer.close = lambda **_kwargs: None
+            for control_type in ("KeepAlive", "Finalize", "CloseStream"):
+                await consumer.receive(text_data=f'{{"type":"{control_type}"}}')
+            return consumer.connection.calls
+
+        self.assertEqual(
+            asyncio.run(exercise()),
+            ["KeepAlive", "Finalize", "CloseStream"],
+        )
 
     def test_unmodeled_sdk_frames_are_ignored(self):
         class Connection:

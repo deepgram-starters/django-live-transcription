@@ -12,6 +12,7 @@ from deepgram import AsyncDeepgramClient
 from deepgram.environment import DeepgramClientEnvironment
 from deepgram.core.api_error import ApiError
 from starter.views import SESSION_SECRET
+from websockets.exceptions import ConnectionClosed
 
 load_dotenv()
 API_KEY = os.environ.get("DEEPGRAM_API_KEY")
@@ -43,11 +44,18 @@ def _safe_error_detail(e):
     NEVER surface str(e): a deepgram-sdk ApiError stringifies its request
     headers, which include `Authorization: Token <api-key>`. Forwarding that
     to the browser (or writing it to logs) leaks the API key, so we only ever
-    expose the exception's HTTP status or type name.
+    expose the exception's HTTP status, close information, or type name.
     """
     if isinstance(e, ApiError):
         return f"Deepgram rejected the connection (HTTP {e.status_code})"
-    return f"Failed to connect to Deepgram ({type(e).__name__})"
+    if isinstance(e, ConnectionClosed):
+        close = e.rcvd or e.sent
+        if close:
+            return (
+                "Deepgram closed the connection "
+                f"(code {close.code}: {close.reason or 'no reason provided'})"
+            )
+    return f"Deepgram error ({type(e).__name__})"
 
 
 class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
@@ -90,6 +98,7 @@ class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
         punctuate = params.get('punctuate', ['true'])[0]
         encoding = params.get('encoding', ['linear16'])[0]
         sample_rate = params.get('sample_rate', ['16000'])[0]
+        channels = params.get('channels', [None])[0]
 
         print(f"Connecting to Deepgram STT: model={model}, language={language}")
 
@@ -104,6 +113,7 @@ class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
                 punctuate=punctuate,
                 encoding=encoding,
                 sample_rate=sample_rate,
+                channels=channels,
             )
             self.connection = await self._connection_cm.__aenter__()
             print("Connected to Deepgram STT API")
@@ -138,7 +148,7 @@ class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
                 print(f"Error closing Deepgram connection: {_safe_error_detail(e)}")
 
     async def receive(self, text_data=None, bytes_data=None):
-        """Forward audio from client to Deepgram"""
+        """Forward browser audio and supported control frames to Deepgram."""
         if not self.connection:
             return
 
@@ -146,8 +156,21 @@ class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
             if bytes_data:
                 await self.connection.send_media(bytes_data)
             elif text_data:
-                # The frontend streams raw audio only; ignore any stray text frames.
-                print("Ignoring unexpected text message from client")
+                try:
+                    control_type = json.loads(text_data).get("type")
+                except (json.JSONDecodeError, AttributeError):
+                    control_type = None
+
+                controls = {
+                    "KeepAlive": self.connection.send_keep_alive,
+                    "Finalize": self.connection.send_finalize,
+                    "CloseStream": self.connection.send_close_stream,
+                }
+                send_control = controls.get(control_type)
+                if send_control:
+                    await send_control()
+                else:
+                    print("Ignoring unexpected text message from client")
         except Exception as e:
             print(f"Error forwarding to Deepgram: {_safe_error_detail(e)}")
             await self.close(code=3000)

@@ -89,7 +89,7 @@ The backend passes WebSocket parameters to `deepgram.listen.v1.connect(...)` in 
 
 | Parameter | Default | Options | Effect |
 |-----------|---------|---------|--------|
-| `model` | `nova-3` | `nova-3`, `nova-2`, `base` | STT model |
+| `model` | `nova-2` | `nova-3`, `nova-2`, `base` | STT model |
 | `language` | `en` | Any BCP-47 code | Transcription language |
 | `smart_format` | `true` | `true`/`false` | Smart formatting |
 | `encoding` | `linear16` | `linear16`, `opus`, `flac` | Audio encoding |
@@ -97,7 +97,7 @@ The backend passes WebSocket parameters to `deepgram.listen.v1.connect(...)` in 
 | `channels` | `1` | `1`, `2` | Mono or stereo |
 
 ### Adding More Deepgram Features via Query Params
-These can be appended to the Deepgram WebSocket URL as query parameters:
+The frontend sends these as browser WebSocket query parameters. Read them in the backend and pass supported values as keyword arguments to `deepgram.listen.v1.connect(...)`:
 
 | Feature | Parameter | Example | Effect |
 |---------|-----------|---------|--------|
@@ -110,7 +110,7 @@ These can be appended to the Deepgram WebSocket URL as query parameters:
 | Keywords | `keywords` | `deepgram:2` | Boost keyword with weight |
 | No delay | `no_delay` | `true` | Minimize latency (may reduce accuracy) |
 
-**Backend:** Append params to the Deepgram URL in the WebSocket proxy handler.
+**Backend:** Pass supported params as keyword arguments to `deepgram.listen.v1.connect(...)` in the WebSocket proxy handler.
 
 **Frontend:** The frontend sends these as query params when opening the WebSocket. To add a UI control for a new param, edit `frontend/main.js` — add an input/checkbox and include it in the `URLSearchParams` when connecting.
 
@@ -165,7 +165,7 @@ chore(deps): update frontend submodule
 make test
 
 # Run browser-safe error-detail regression tests
-python -m unittest discover -s tests
+./venv/bin/python -m unittest discover -s tests
 
 # Manual endpoint check
 curl -sf http://localhost:8081/api/metadata | python3 -m json.tool
