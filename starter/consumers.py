@@ -193,6 +193,8 @@ class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
                 elif message is None:
                     # The SDK uses None for unmodeled listen.v1 frames.
                     continue
+                elif isinstance(message, dict):
+                    await self.send(text_data=json.dumps(message))
                 elif hasattr(message, "model_dump_json"):
                     await self.send(text_data=message.model_dump_json())
                 else:

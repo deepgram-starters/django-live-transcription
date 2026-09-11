@@ -124,3 +124,32 @@ class SafeErrorDetailTests(unittest.TestCase):
             return sent
 
         self.assertEqual(asyncio.run(exercise()), [])
+
+    def test_plain_dictionary_frames_are_forwarded_unchanged(self):
+        class Connection:
+            async def messages(self):
+                yield {"type": "Results", "channel": {"alternatives": []}}
+
+            def __aiter__(self):
+                return self.messages()
+
+        async def exercise():
+            consumer = object.__new__(LiveTranscriptionConsumer)
+            consumer.connection = Connection()
+            sent = []
+
+            async def send(**kwargs):
+                sent.append(kwargs)
+
+            async def close(**_kwargs):
+                pass
+
+            consumer.send = send
+            consumer.close = close
+            await consumer.forward_from_deepgram()
+            return sent
+
+        self.assertEqual(
+            asyncio.run(exercise()),
+            [{"text_data": '{"type": "Results", "channel": {"alternatives": []}}'}],
+        )
