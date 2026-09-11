@@ -85,11 +85,11 @@ Frontend: `cd frontend && corepack pnpm install`
 ## Customization Guide
 
 ### Changing Default Parameters
-The backend passes WebSocket parameters to `deepgram.listen.v1.connect(...)` in `starter/consumers.py`. Modify those keyword arguments to change defaults:
+The frontend defaults to `nova-3`; the backend falls back to `nova-2` if the browser omits `model`. The backend passes supported WebSocket parameters to `deepgram.listen.v1.connect(...)` in `starter/consumers.py`.
 
 | Parameter | Default | Options | Effect |
 |-----------|---------|---------|--------|
-| `model` | `nova-2` | `nova-3`, `nova-2`, `base` | STT model |
+| `model` | `nova-3` | `nova-3`, `nova-2`, `base` | STT model |
 | `language` | `en` | Any BCP-47 code | Transcription language |
 | `smart_format` | `true` | `true`/`false` | Smart formatting |
 | `encoding` | `linear16` | `linear16`, `opus`, `flac` | Audio encoding |
@@ -97,7 +97,7 @@ The backend passes WebSocket parameters to `deepgram.listen.v1.connect(...)` in 
 | `channels` | `1` | `1`, `2` | Mono or stereo |
 
 ### Adding More Deepgram Features via Query Params
-The frontend sends these as browser WebSocket query parameters. Read them in the backend and pass supported values as keyword arguments to `deepgram.listen.v1.connect(...)`:
+To add one of these features, include its browser WebSocket query parameter in `frontend/main.js`, then read it in the backend and pass it as a keyword argument to `deepgram.listen.v1.connect(...)`:
 
 | Feature | Parameter | Example | Effect |
 |---------|-----------|---------|--------|
@@ -143,6 +143,7 @@ The frontend is a git submodule from `deepgram-starters/live-transcription-html`
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
 | `DEEPGRAM_API_KEY` | Yes | — | Deepgram API key |
+| `DEEPGRAM_BASE_URL` | No | Production endpoint | Override the Deepgram WebSocket endpoint for testing or staging |
 | `PORT` | No | `8081` | Backend server port |
 | `HOST` | No | `0.0.0.0` | Backend bind address |
 | `SESSION_SECRET` | No | — | JWT signing secret (production) |
