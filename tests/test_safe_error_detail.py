@@ -99,13 +99,16 @@ class SafeErrorDetailTests(unittest.TestCase):
         )
         self.assertEqual(closed, [{"code": 3000}])
 
-    def test_unmodeled_sdk_frames_are_ignored(self):
-        class Connection:
+    def test_raw_deepgram_error_frames_reach_the_browser(self):
+        class Socket:
             async def messages(self):
-                yield None
+                yield '{"type":"Error","variant":"SchemaError","description":"Invalid control frame"}'
 
             def __aiter__(self):
                 return self.messages()
+
+        class Connection:
+            _websocket = Socket()
 
         async def exercise():
             consumer = object.__new__(LiveTranscriptionConsumer)
@@ -123,15 +126,21 @@ class SafeErrorDetailTests(unittest.TestCase):
             await consumer.forward_from_deepgram()
             return sent
 
-        self.assertEqual(asyncio.run(exercise()), [])
+        self.assertEqual(
+            asyncio.run(exercise()),
+            [{"text_data": '{"type":"Error","variant":"SchemaError","description":"Invalid control frame"}'}],
+        )
 
     def test_plain_dictionary_frames_are_forwarded_unchanged(self):
         class Connection:
-            async def messages(self):
-                yield {"type": "Results", "channel": {"alternatives": []}}
+            class Socket:
+                async def messages(self):
+                    yield {"type": "Results", "channel": {"alternatives": []}}
 
-            def __aiter__(self):
-                return self.messages()
+                def __aiter__(self):
+                    return self.messages()
+
+            _websocket = Socket()
 
         async def exercise():
             consumer = object.__new__(LiveTranscriptionConsumer)

@@ -58,6 +58,15 @@ def _safe_error_detail(e):
     return f"Deepgram error ({type(e).__name__})"
 
 
+async def _raw_deepgram_frames(connection):
+    """Yield original websocket frames, including events the SDK does not model."""
+    websocket = getattr(connection, "_websocket", None)
+    if websocket is None or not hasattr(websocket, "__aiter__"):
+        raise RuntimeError("Deepgram SDK connection does not expose an async websocket")
+    async for frame in websocket:
+        yield frame
+
+
 class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -187,12 +196,11 @@ class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
     async def forward_from_deepgram(self):
         """Forward Deepgram messages to the browser: bytes as binary, models as JSON."""
         try:
-            async for message in self.connection:
+            async for message in _raw_deepgram_frames(self.connection):
                 if isinstance(message, (bytes, bytearray)):
                     await self.send(bytes_data=bytes(message))
-                elif message is None:
-                    # The SDK uses None for unmodeled listen.v1 frames.
-                    continue
+                elif isinstance(message, str):
+                    await self.send(text_data=message)
                 elif isinstance(message, dict):
                     await self.send(text_data=json.dumps(message))
                 elif hasattr(message, "model_dump_json"):
