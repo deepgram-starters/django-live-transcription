@@ -96,7 +96,7 @@ The shipped frontend selects `nova-3`; the backend falls back to `nova-2` if the
 | `punctuate` | `true` | `true`/`false` | Auto-punctuation |
 | `encoding` | `linear16` | `linear16`, `opus`, `flac` | Audio encoding |
 | `sample_rate` | `16000` | `8000`, `16000`, `44100`, `48000` | Audio sample rate |
-| `channels` | `1` | `1`, `2` | Mono or stereo |
+| `channels` | omitted (API defaults to `1`) | `1`, `2` | Mono or stereo |
 
 ### Adding More Deepgram Features via Query Params
 The frontend currently sends `model`, `language`, `smart_format`, `interim_results`, `punctuate`, `encoding`, `sample_rate`, and `channels`. To add a feature below that is supported by a typed `connect()` argument, include its browser WebSocket query parameter in `frontend/main.js`, then read it in the backend and pass it as a keyword argument to `deepgram.listen.v1.connect(...)`:

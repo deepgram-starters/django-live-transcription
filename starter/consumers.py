@@ -60,6 +60,8 @@ def _safe_error_detail(e):
                 "Deepgram closed the connection "
                 f"(code {close.code}: {close.reason or 'no reason provided'})"
             )
+    if isinstance(e, RuntimeError) and str(e) == _RAW_FRAME_COMPATIBILITY_ERROR:
+        return "Deepgram SDK raw frame transport is unavailable"
     return f"Deepgram error ({type(e).__name__})"
 
 

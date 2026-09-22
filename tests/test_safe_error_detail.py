@@ -170,3 +170,14 @@ class SafeErrorDetailTests(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "private _websocket transport"):
             asyncio.run(exercise())
+
+    def test_missing_private_transport_has_a_browser_safe_error(self):
+        error = RuntimeError(
+            "Deepgram SDK connection does not expose the private _websocket transport "
+            "needed to preserve raw transcription frames"
+        )
+
+        self.assertEqual(
+            _safe_error_detail(error),
+            "Deepgram SDK raw frame transport is unavailable",
+        )
