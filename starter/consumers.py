@@ -19,6 +19,11 @@ API_KEY = os.environ.get("DEEPGRAM_API_KEY")
 if not API_KEY:
     raise ValueError("DEEPGRAM_API_KEY required")
 
+_RAW_FRAME_COMPATIBILITY_ERROR = (
+    "Deepgram SDK connection does not expose the private _websocket transport "
+    "needed to preserve raw transcription frames"
+)
+
 
 # One async SDK client, reused across connections; the browser never sees the API key.
 # DEEPGRAM_BASE_URL (e.g. wss://api.staging.deepgram.com) overrides the default
@@ -62,7 +67,7 @@ async def _raw_deepgram_frames(connection):
     """Yield original websocket frames, including events the SDK does not model."""
     websocket = getattr(connection, "_websocket", None)
     if websocket is None or not hasattr(websocket, "__aiter__"):
-        raise RuntimeError("Deepgram SDK connection does not expose an async websocket")
+        raise RuntimeError(_RAW_FRAME_COMPATIBILITY_ERROR)
     async for frame in websocket:
         yield frame
 

@@ -11,7 +11,7 @@ import django
 django.setup()
 
 from deepgram.core.api_error import ApiError
-from starter.consumers import _safe_error_detail
+from starter.consumers import _raw_deepgram_frames, _safe_error_detail
 from starter.consumers import LiveTranscriptionConsumer
 from websockets.exceptions import ConnectionClosed
 from websockets.frames import Close
@@ -162,3 +162,11 @@ class SafeErrorDetailTests(unittest.TestCase):
             asyncio.run(exercise()),
             [{"text_data": '{"type": "Results", "channel": {"alternatives": []}}'}],
         )
+
+    def test_missing_private_transport_fails_loudly(self):
+        async def exercise():
+            async for _ in _raw_deepgram_frames(object()):
+                pass
+
+        with self.assertRaisesRegex(RuntimeError, "private _websocket transport"):
+            asyncio.run(exercise())
