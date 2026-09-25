@@ -92,7 +92,7 @@ The shipped frontend selects `nova-3`; the backend falls back to `nova-2` if the
 | `model` | `nova-2` | `nova-3`, `nova-2`, `base` | STT model |
 | `language` | `en` | Any BCP-47 code | Transcription language |
 | `smart_format` | `true` | `true`/`false` | Smart formatting |
-| `interim_results` | `true` | `true`/`false` | Return partial transcripts while speaking |
+| `interim_results` | `false` | `true`/`false` | Return partial transcripts while speaking |
 | `punctuate` | `true` | `true`/`false` | Auto-punctuation |
 | `encoding` | `linear16` | `linear16`, `opus`, `flac` | Audio encoding |
 | `sample_rate` | `16000` | `8000`, `16000`, `44100`, `48000` | Audio sample rate |
@@ -117,7 +117,7 @@ The frontend currently sends `model`, `language`, `smart_format`, `interim_resul
 **Frontend:** To add a UI control for a new param, edit `frontend/main.js` — add an input/checkbox and include it in the `URLSearchParams` when connecting.
 
 ### Raw Frame Forwarding
-The public SDK iterator can omit events it does not model. To preserve Deepgram `Error` frames and future event types, `starter/consumers.py` reads the SDK connection's private `_websocket` transport and forwards each raw frame unchanged. This dependency is guarded with a clear runtime error and is covered by a regression test. Keep the SDK below 8.0.0 until a public lossless raw-frame iterator replaces it.
+The public SDK iterator can omit events it does not model. To preserve Deepgram `Error` frames and future event types, `starter/consumers.py` reads the SDK connection's private `_websocket` transport and forwards each raw frame unchanged. Browser `KeepAlive`, `Finalize`, and `CloseStream` controls use their matching SDK methods. This dependency is guarded with a clear runtime error and is covered by a regression test against an SDK connection object. Keep the SDK below 8.0.0 until a public lossless raw-frame iterator replaces it.
 
 ### Changing Audio Format
 If changing from browser microphone (Linear16) to another source:

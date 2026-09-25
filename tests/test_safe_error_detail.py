@@ -1,7 +1,10 @@
-import os
-import unittest
 import asyncio
 import json
+import os
+import unittest
+from unittest.mock import patch
+
+import jwt
 
 os.environ.setdefault("DEEPGRAM_API_KEY", "test-api-key")
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
@@ -11,8 +14,10 @@ import django
 django.setup()
 
 from deepgram.core.api_error import ApiError
+from deepgram.listen.v1.socket_client import AsyncV1SocketClient
 from starter.consumers import _raw_deepgram_frames, _safe_error_detail
 from starter.consumers import LiveTranscriptionConsumer
+from starter.views import SESSION_SECRET
 from websockets.exceptions import ConnectionClosed
 from websockets.frames import Close
 
@@ -65,6 +70,53 @@ class SafeErrorDetailTests(unittest.TestCase):
             asyncio.run(exercise()),
             ["KeepAlive", "Finalize", "CloseStream"],
         )
+
+    def test_interim_results_default_to_false(self):
+        class ConnectionContext:
+            async def __aenter__(self):
+                return object()
+
+        class Listen:
+            def __init__(self):
+                self.kwargs = None
+
+            def connect(self, **kwargs):
+                self.kwargs = kwargs
+                return ConnectionContext()
+
+        class Deepgram:
+            def __init__(self):
+                self.listen = type("ListenNamespace", (), {"v1": Listen()})()
+
+        async def exercise():
+            consumer = object.__new__(LiveTranscriptionConsumer)
+            token = jwt.encode({"sub": "test"}, SESSION_SECRET, algorithm="HS256")
+            consumer.scope = {
+                "subprotocols": [f"access_token.{token}"],
+                "query_string": b"",
+            }
+
+            async def accept(**_kwargs):
+                pass
+
+            async def close(**_kwargs):
+                pass
+
+            consumer.accept = accept
+            consumer.close = close
+            client = Deepgram()
+
+            def create_task(coroutine):
+                coroutine.close()
+                return object()
+
+            with patch("starter.consumers.deepgram", client), patch(
+                "starter.consumers.asyncio.create_task", side_effect=create_task
+            ):
+                await consumer.connect()
+            return client.listen.v1.kwargs
+
+        self.assertEqual(asyncio.run(exercise())["interim_results"], "false")
 
     def test_media_send_failure_reports_a_safe_provider_error(self):
         class Connection:
@@ -129,6 +181,23 @@ class SafeErrorDetailTests(unittest.TestCase):
         self.assertEqual(
             asyncio.run(exercise()),
             [{"text_data": '{"type":"Error","variant":"SchemaError","description":"Invalid control frame"}'}],
+        )
+
+    def test_sdk_socket_client_exposes_raw_transport(self):
+        class Socket:
+            async def messages(self):
+                yield '{"type":"Error","description":"Invalid control frame"}'
+
+            def __aiter__(self):
+                return self.messages()
+
+        async def exercise():
+            connection = AsyncV1SocketClient(websocket=Socket())
+            return [frame async for frame in _raw_deepgram_frames(connection)]
+
+        self.assertEqual(
+            asyncio.run(exercise()),
+            ['{"type":"Error","description":"Invalid control frame"}'],
         )
 
     def test_plain_dictionary_frames_are_forwarded_unchanged(self):

@@ -8,12 +8,16 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.13"]
+        sdk-spec: ["deepgram-sdk==7.7.0", "deepgram-sdk<8.0.0"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install -r requirements.txt
+      - run: python -m pip install -r requirements.txt "${{ matrix.sdk-spec }}"
       - run: python manage.py check
       - run: python -m unittest discover -s tests

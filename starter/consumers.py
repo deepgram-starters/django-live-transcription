@@ -110,7 +110,7 @@ class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
         model = params.get('model', ['nova-2'])[0]
         language = params.get('language', ['en'])[0]
         smart_format = params.get('smart_format', ['true'])[0]
-        interim_results = params.get('interim_results', ['true'])[0]
+        interim_results = params.get('interim_results', ['false'])[0]
         punctuate = params.get('punctuate', ['true'])[0]
         encoding = params.get('encoding', ['linear16'])[0]
         sample_rate = params.get('sample_rate', ['16000'])[0]
