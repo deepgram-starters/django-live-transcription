@@ -183,6 +183,35 @@ class SafeErrorDetailTests(unittest.TestCase):
             [{"text_data": '{"type":"Error","variant":"SchemaError","description":"Invalid control frame"}'}],
         )
 
+    def test_raw_frame_failure_reports_a_provider_error_and_fails_the_socket(self):
+        async def exercise():
+            consumer = object.__new__(LiveTranscriptionConsumer)
+            consumer.connection = object()
+            sent = []
+            closed = []
+
+            async def send(**kwargs):
+                sent.append(kwargs)
+
+            async def close(**kwargs):
+                closed.append(kwargs)
+
+            consumer.send = send
+            consumer.close = close
+            await consumer.forward_from_deepgram()
+            return sent, closed
+
+        sent, closed = asyncio.run(exercise())
+        self.assertEqual(
+            json.loads(sent[0]["text_data"]),
+            {
+                "type": "Error",
+                "description": "Deepgram SDK raw frame transport is unavailable",
+                "code": "PROVIDER_ERROR",
+            },
+        )
+        self.assertEqual(closed, [{"code": 3000}])
+
     def test_sdk_socket_client_exposes_raw_transport(self):
         class Socket:
             async def messages(self):

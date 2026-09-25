@@ -202,6 +202,7 @@ class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
 
     async def forward_from_deepgram(self):
         """Forward Deepgram messages to the browser: bytes as binary, models as JSON."""
+        close_code = 1000
         try:
             async for message in _raw_deepgram_frames(self.connection):
                 if isinstance(message, (bytes, bytearray)):
@@ -219,6 +220,7 @@ class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
         except asyncio.CancelledError:
             pass
         except Exception as e:
+            close_code = 3000
             detail = _safe_error_detail(e)
             print(f"Error forwarding from Deepgram: {detail}")
             try:
@@ -231,6 +233,6 @@ class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
                 pass
         finally:
             try:
-                await self.close(code=1000)
+                await self.close(code=close_code)
             except Exception:
                 pass
