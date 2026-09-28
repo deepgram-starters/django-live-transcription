@@ -71,7 +71,7 @@ class SafeErrorDetailTests(unittest.TestCase):
             ["KeepAlive", "Finalize", "CloseStream"],
         )
 
-    def test_interim_results_default_to_false(self):
+    def test_omitted_query_defaults_match_the_frontend(self):
         class ConnectionContext:
             async def __aenter__(self):
                 return object()
@@ -116,7 +116,9 @@ class SafeErrorDetailTests(unittest.TestCase):
                 await consumer.connect()
             return client.listen.v1.kwargs
 
-        self.assertEqual(asyncio.run(exercise())["interim_results"], "false")
+        options = asyncio.run(exercise())
+        self.assertEqual(options["model"], "nova-3")
+        self.assertEqual(options["interim_results"], "false")
 
     def test_media_send_failure_reports_a_safe_provider_error(self):
         class Connection:

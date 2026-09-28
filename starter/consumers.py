@@ -107,7 +107,7 @@ class LiveTranscriptionConsumer(AsyncWebsocketConsumer):
         query_string = self.scope.get('query_string', b'').decode('utf-8')
         params = parse_qs(query_string)
 
-        model = params.get('model', ['nova-2'])[0]
+        model = params.get('model', ['nova-3'])[0]
         language = params.get('language', ['en'])[0]
         smart_format = params.get('smart_format', ['true'])[0]
         interim_results = params.get('interim_results', ['false'])[0]
