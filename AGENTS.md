@@ -67,7 +67,7 @@ make init
 
 ## Dependencies
 
-- **Backend:** `requirements.txt` — Django uses Daphne (ASGI) for WebSocket support. REST starters use views.py, WebSocket starters use consumers.py.
+- **Backend:** `requirements.txt` — Django uses Daphne (ASGI) for WebSocket support and `deepgram-sdk>=7.7.0,<8.0.0`. REST starters use views.py, WebSocket starters use consumers.py.
 - **Frontend:** `frontend/package.json` — Vite dev server
 - **Submodules:** `frontend/` (live-transcription-html), `contracts/` (starter-contracts)
 
@@ -85,19 +85,21 @@ Frontend: `cd frontend && corepack pnpm install`
 ## Customization Guide
 
 ### Changing Default Parameters
-The WebSocket connection URL passes parameters to Deepgram. Find where the Deepgram WebSocket URL is constructed in the backend and modify defaults:
+The shipped frontend selects `nova-3`; the backend falls back to `nova-2` if the browser omits `model`. The backend passes supported WebSocket parameters to `deepgram.listen.v1.connect(...)` in `starter/consumers.py`.
 
 | Parameter | Default | Options | Effect |
 |-----------|---------|---------|--------|
-| `model` | `nova-3` | `nova-3`, `nova-2`, `base` | STT model |
+| `model` | `nova-2` | `nova-3`, `nova-2`, `base` | STT model |
 | `language` | `en` | Any BCP-47 code | Transcription language |
 | `smart_format` | `true` | `true`/`false` | Smart formatting |
+| `interim_results` | `false` | `true`/`false` | Return partial transcripts while speaking |
+| `punctuate` | `true` | `true`/`false` | Auto-punctuation |
 | `encoding` | `linear16` | `linear16`, `opus`, `flac` | Audio encoding |
 | `sample_rate` | `16000` | `8000`, `16000`, `44100`, `48000` | Audio sample rate |
-| `channels` | `1` | `1`, `2` | Mono or stereo |
+| `channels` | omitted (API defaults to `1`) | `1`, `2` | Mono or stereo |
 
 ### Adding More Deepgram Features via Query Params
-These can be appended to the Deepgram WebSocket URL as query parameters:
+The frontend currently sends `model`, `language`, `smart_format`, `interim_results`, `punctuate`, `encoding`, `sample_rate`, and `channels`. To add a feature below that is supported by a typed `connect()` argument, include its browser WebSocket query parameter in `frontend/main.js`, then read it in the backend and pass it as a keyword argument to `deepgram.listen.v1.connect(...)`:
 
 | Feature | Parameter | Example | Effect |
 |---------|-----------|---------|--------|
@@ -110,9 +112,12 @@ These can be appended to the Deepgram WebSocket URL as query parameters:
 | Keywords | `keywords` | `deepgram:2` | Boost keyword with weight |
 | No delay | `no_delay` | `true` | Minimize latency (may reduce accuracy) |
 
-**Backend:** Append params to the Deepgram URL in the WebSocket proxy handler.
+**Backend:** Pass typed params as keyword arguments to `deepgram.listen.v1.connect(...)` in the WebSocket proxy handler. For unmodeled options such as `no_delay`, use `request_options={"additional_query_parameters": {"no_delay": value}}`.
 
-**Frontend:** The frontend sends these as query params when opening the WebSocket. To add a UI control for a new param, edit `frontend/main.js` — add an input/checkbox and include it in the `URLSearchParams` when connecting.
+**Frontend:** To add a UI control for a new param, edit `frontend/main.js` — add an input/checkbox and include it in the `URLSearchParams` when connecting.
+
+### Raw Frame Forwarding
+The public SDK iterator can omit events it does not model. To preserve Deepgram `Error` frames and future event types, `starter/consumers.py` reads the SDK connection's private `_websocket` transport and forwards each raw frame unchanged. Browser `KeepAlive`, `Finalize`, and `CloseStream` controls use their matching SDK methods. This dependency is guarded with a clear runtime error and is covered by a regression test against an SDK connection object. Keep the SDK below 8.0.0 until a public lossless raw-frame iterator replaces it.
 
 ### Changing Audio Format
 If changing from browser microphone (Linear16) to another source:
@@ -143,9 +148,13 @@ The frontend is a git submodule from `deepgram-starters/live-transcription-html`
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
 | `DEEPGRAM_API_KEY` | Yes | — | Deepgram API key |
+| `DEEPGRAM_BASE_URL` | No | `wss://api.deepgram.com` | Override the WebSocket origin for testing or staging, e.g. `wss://api.staging.deepgram.com` (without `/v1/listen`) |
 | `PORT` | No | `8081` | Backend server port |
 | `HOST` | No | `0.0.0.0` | Backend bind address |
 | `SESSION_SECRET` | No | — | JWT signing secret (production) |
+
+## Deployment
+Pushes to `main` deploy to Fly.io only after the `Test` workflow succeeds. The Docker build also depends on the pinned `live-transcription-html` frontend; if its external `packageManager`/esbuild fix is not available, Fly deployment remains blocked even when this repository's test workflow is green.
 
 ## Conventional Commits
 
@@ -163,6 +172,9 @@ chore(deps): update frontend submodule
 ```bash
 # Run conformance tests (requires app to be running)
 make test
+
+# Run browser-safe error-detail regression tests
+./venv/bin/python -m unittest discover -s tests
 
 # Manual endpoint check
 curl -sf http://localhost:8081/api/metadata | python3 -m json.tool
