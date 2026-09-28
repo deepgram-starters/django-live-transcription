@@ -85,11 +85,11 @@ Frontend: `cd frontend && corepack pnpm install`
 ## Customization Guide
 
 ### Changing Default Parameters
-The shipped frontend selects `nova-3`; the backend falls back to `nova-2` if the browser omits `model`. The backend passes supported WebSocket parameters to `deepgram.listen.v1.connect(...)` in `starter/consumers.py`.
+The shipped frontend selects `nova-3`; the backend also falls back to `nova-3` if the browser omits `model`. The backend passes supported WebSocket parameters to `deepgram.listen.v1.connect(...)` in `starter/consumers.py`.
 
 | Parameter | Default | Options | Effect |
 |-----------|---------|---------|--------|
-| `model` | `nova-2` | `nova-3`, `nova-2`, `base` | STT model |
+| `model` | `nova-3` | `nova-3`, `nova-2`, `base` | STT model |
 | `language` | `en` | Any BCP-47 code | Transcription language |
 | `smart_format` | `true` | `true`/`false` | Smart formatting |
 | `interim_results` | `false` | `true`/`false` | Return partial transcripts while speaking |
